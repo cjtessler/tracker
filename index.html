@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=800, height=480, initial-scale=1.0, user-scalable=no">
+  <title>Pedal Tracker</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Flash overlay for pedal press feedback -->
+  <div id="flash-overlay"></div>
+
+  <!-- ==================== START SCREEN ==================== -->
+  <div id="start-screen" class="screen">
+    <div class="start-content">
+      <h1>Pedal Tracker</h1>
+      <p class="start-subtitle">Track presses across CB-105, PVS, and PVSI</p>
+      <div id="section-selector" class="section-selector">
+        <button class="section-option active" data-section="CB-105">CB-105</button>
+        <button class="section-option" data-section="PVS">PVS</button>
+        <button class="section-option" data-section="PVSI">PVSI</button>
+      </div>
+      <button id="start-btn" class="btn btn-start">Tap to Start Session</button>
+      <div id="last-session-info" class="last-session-info" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- ==================== RESUME PROMPT ==================== -->
+  <div id="resume-screen" class="screen" style="display:none;">
+    <div class="start-content">
+      <h1>Session Found</h1>
+      <p id="resume-info" class="start-subtitle"></p>
+      <p id="resume-section" class="resume-section-label"></p>
+      <button id="resume-btn" class="btn btn-start">Resume Session</button>
+      <button id="discard-btn" class="btn btn-end" style="margin-top:16px;">Start New</button>
+    </div>
+  </div>
+
+  <!-- ==================== SESSION SCREEN ==================== -->
+  <div id="session-screen" class="screen" style="display:none;">
+
+    <!-- Session header (locked section) -->
+    <div id="session-header">
+      <span id="session-section-name">CB-105</span>
+      <span id="session-section-count" class="session-count">0</span>
+    </div>
+
+    <!-- Timer display -->
+    <div id="timer-display">
+      <span id="timer-value">00:00</span>
+      <span id="timer-label">since last press</span>
+    </div>
+
+    <!-- Stats bar -->
+    <div id="stats-bar">
+      <div class="stat">
+        <span class="stat-label">Rate</span>
+        <span class="stat-value" id="stat-rate">--/min</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Avg</span>
+        <span class="stat-value" id="stat-avg">--</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Total</span>
+        <span class="stat-value" id="stat-total">0</span>
+      </div>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="button-bar">
+      <button id="undo-btn" class="btn btn-undo" disabled>Undo</button>
+      <button id="end-btn" class="btn btn-end">End Session</button>
+    </div>
+
+    <!-- Status bar -->
+    <div id="status-bar">
+      <span id="status-text"></span>
+    </div>
+
+    <!-- Audio unlock banner (shown when restoring session) -->
+    <div id="audio-banner" style="display:none;">Tap anywhere to enable audio</div>
+
+  </div>
+
+  <!-- ==================== SUMMARY SCREEN ==================== -->
+  <div id="summary-screen" class="screen" style="display:none;">
+    <div id="summary-content">
+      <h2>Session Summary</h2>
+      <div id="summary-duration" class="summary-duration"></div>
+      <div id="summary-sections"></div>
+      <div id="summary-totals" class="summary-totals"></div>
+      <button id="new-session-btn" class="btn btn-start" style="margin-top:16px;">New Session</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
