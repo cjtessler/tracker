@@ -14,8 +14,6 @@
   <!-- ==================== START SCREEN ==================== -->
   <div id="start-screen" class="screen">
     <div class="start-content">
-      <h1>Pedal Tracker</h1>
-      <p class="start-subtitle">Track presses across CB-105, PVS, and PVSI</p>
       <div id="section-selector" class="section-selector">
         <button class="section-option" data-section="CB-105">CB-105</button>
         <button class="section-option" data-section="PVS">PVS</button>
@@ -84,8 +82,10 @@
       <h1>End Session</h1>
       <p class="start-subtitle">Would you like to save or discard this session?</p>
       <div id="save-discard-stats" class="save-discard-stats"></div>
-      <button id="save-btn" class="btn btn-start">Save Session</button>
-      <button id="discard-session-btn" class="btn btn-end" style="margin-top:12px;">Discard</button>
+      <div class="save-discard-buttons">
+        <button id="discard-session-btn" class="btn btn-discard">Discard</button>
+        <button id="save-btn" class="btn btn-start">Save Session</button>
+      </div>
     </div>
   </div>
 

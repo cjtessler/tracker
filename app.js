@@ -3,6 +3,7 @@ const SECTIONS = ['CB-105', 'PVS', 'PVSI'];
 const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
 const STORAGE_KEY = 'pedal-tracker-session';
+const HISTORY_KEY = 'pedal-tracker-history';
 const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
@@ -13,9 +14,14 @@ let lastPressTime = 0;
 let lastAlertedMinute = 0;
 let endConfirmTimer = null;
 let endConfirmPending = false;
+let clearConfirmPending = false;
+let clearConfirmTimer = null;
+let deleteConfirmPending = false;
+let deleteConfirmTimer = null;
 let audioCtx = null;
 let statusTimeout = null;
 let selectedSection = null;
+let viewingHistorySession = null;
 
 // === DOM REFS ===
 const $ = (id) => document.getElementById(id);
@@ -39,6 +45,33 @@ const Storage = {
   },
   clear() {
     localStorage.removeItem(STORAGE_KEY);
+  },
+  saveToHistory(s) {
+    const history = Storage.loadHistory();
+    const entry = JSON.parse(JSON.stringify(s));
+    delete entry.undoStack;
+    delete entry.active;
+    history.unshift(entry);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {}
+  },
+  loadHistory() {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+  deleteFromHistory(id) {
+    const history = Storage.loadHistory().filter(s => s.id !== id);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {}
+  },
+  clearHistory() {
+    localStorage.removeItem(HISTORY_KEY);
   }
 };
 
@@ -106,11 +139,12 @@ function getElapsedMs() {
   return Date.now() - ref;
 }
 
-function computeMetrics(sectionName) {
-  const sec = session.sections[sectionName];
+function computeMetrics(sectionName, s) {
+  s = s || session;
+  const sec = s.sections[sectionName];
   const ts = sec.timestamps;
-  const sessionStart = new Date(session.startTime).getTime();
-  const sessionEnd = session.endTime ? new Date(session.endTime).getTime() : Date.now();
+  const sessionStart = new Date(s.startTime).getTime();
+  const sessionEnd = s.endTime ? new Date(s.endTime).getTime() : Date.now();
   const sessionDurMin = (sessionEnd - sessionStart) / 60000;
 
   if (ts.length === 0) {
@@ -359,8 +393,17 @@ const Input = {
     // Show quick stats on save/discard screen
     const sec = session.sections[session.activeSection];
     const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
+    const durMin = durMs / 60000;
+    const metrics = computeMetrics(session.activeSection);
+    const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
+    const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
     $('save-discard-stats').innerHTML =
-      `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>`;
+      `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
+      `<div class="save-discard-details">` +
+        `<span>Rate: ${rate}</span>` +
+        `<span>Avg: ${avg}</span>` +
+        `<span>Total: ${sec.count}</span>` +
+      `</div>`;
 
     showScreen('save-discard');
   }
