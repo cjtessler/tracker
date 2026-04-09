@@ -6,6 +6,9 @@ const STORAGE_KEY = 'pedal-tracker-session';
 const HISTORY_KEY = 'pedal-tracker-history';
 const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+const HOLD_DELAY_MS = 250;
+const HOLD_FILL_MS = 1750;
+const HOLD_THRESHOLD_MS = HOLD_DELAY_MS + HOLD_FILL_MS;
 
 // === STATE ===
 let session = null;
@@ -22,6 +25,10 @@ let audioCtx = null;
 let statusTimeout = null;
 let selectedSection = null;
 let viewingHistorySession = null;
+let bHoldTimer = null;
+let bFillTimer = null;
+let bHoldFired = false;
+let endHoldTimer = null;
 
 // === DOM REFS ===
 const $ = (id) => document.getElementById(id);
@@ -304,22 +311,35 @@ const UI = {
 
 // === INPUT HANDLERS ===
 const Input = {
-  handleKeyPress(e) {
+  handleKeyDown(e) {
     if (e.key !== 'b' || e.repeat) return;
     e.preventDefault();
 
-    // B on start screen → start session (or nudge if no section)
+    // B on start screen → tap cycles section, hold starts session
     if (!session || !session.active) {
       if ($('start-screen').style.display !== 'none') {
-        if (!selectedSection) {
-          nudgeSectionSelector();
-          return;
+        bHoldFired = false;
+        const startBtn = $('start-btn');
+        if (selectedSection) {
+          bFillTimer = setTimeout(() => {
+            startBtn.classList.remove('filling');
+            void startBtn.offsetWidth;
+            startBtn.classList.add('filling');
+          }, HOLD_DELAY_MS);
         }
-        SoundPlayer.init();
-        session = createSession();
-        Storage.save(session);
-        showScreen('session');
-        Timer.start();
+        bHoldTimer = setTimeout(() => {
+          bHoldFired = true;
+          startBtn.classList.remove('filling');
+          if (!selectedSection) {
+            nudgeSectionSelector();
+            return;
+          }
+          SoundPlayer.init();
+          session = createSession();
+          Storage.save(session);
+          showScreen('session');
+          Timer.start();
+        }, HOLD_THRESHOLD_MS);
       }
       return;
     }
@@ -327,6 +347,24 @@ const Input = {
     if (now - lastPressTime < DEBOUNCE_MS) return;
     lastPressTime = now;
     Input.recordPress(now);
+  },
+
+  handleKeyUp(e) {
+    if (e.key !== 'b') return;
+    if (bFillTimer) {
+      clearTimeout(bFillTimer);
+      bFillTimer = null;
+    }
+    if (bHoldTimer) {
+      clearTimeout(bHoldTimer);
+      bHoldTimer = null;
+    }
+    $('start-btn').classList.remove('filling');
+    if (!bHoldFired && (!session || !session.active)) {
+      if ($('start-screen').style.display !== 'none') {
+        cycleSection();
+      }
+    }
   },
 
   recordPress(timestamp) {
@@ -411,7 +449,7 @@ const Input = {
 
 // === SCREEN MANAGEMENT ===
 function showScreen(name) {
-  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen'].forEach(id => {
+  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
@@ -441,6 +479,109 @@ function nudgeSectionSelector() {
   void el.offsetWidth;
   el.classList.add('shake');
   el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
+}
+
+// === CYCLE SECTION ===
+function cycleSection() {
+  const currentIdx = selectedSection ? SECTIONS.indexOf(selectedSection) : -1;
+  const nextIdx = (currentIdx + 1) % SECTIONS.length;
+  selectedSection = SECTIONS[nextIdx];
+  document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
+  document.querySelector(`.section-option[data-section="${selectedSection}"]`).classList.add('active');
+  $('start-btn').disabled = false;
+  SoundPlayer.init();
+  SoundPlayer.playPressClick();
+}
+
+// === HISTORY ===
+function renderHistoryList() {
+  const history = Storage.loadHistory();
+  const list = $('history-list');
+  const empty = $('history-empty');
+
+  // Reset clear confirmation
+  clearConfirmPending = false;
+  $('history-clear-btn').textContent = 'Clear All';
+  $('history-clear-btn').classList.remove('confirm');
+
+  if (history.length === 0) {
+    list.style.display = 'none';
+    empty.style.display = 'flex';
+    $('history-clear-btn').style.display = 'none';
+    return;
+  }
+
+  list.style.display = 'block';
+  empty.style.display = 'none';
+  $('history-clear-btn').style.display = 'block';
+
+  list.innerHTML = history.map(s => {
+    const start = new Date(s.startTime);
+    const end = s.endTime ? new Date(s.endTime) : start;
+    const durMs = end.getTime() - start.getTime();
+    const sec = s.sections[s.activeSection];
+    const durMin = durMs / 60000;
+    const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--';
+    const dateStr = start.toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric'
+    }) + ' ' + start.toLocaleTimeString('en-US', {
+      hour: 'numeric', minute: '2-digit'
+    });
+    return `<div class="history-item" data-id="${s.id}">
+      <div class="history-item-top">
+        <span class="history-item-date">${dateStr}</span>
+        <span class="history-item-section">${s.activeSection}</span>
+      </div>
+      <div class="history-item-stats">${sec.count} presses &middot; ${formatDuration(durMs)} &middot; ${rate}</div>
+    </div>`;
+  }).join('');
+
+  list.querySelectorAll('.history-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const id = Number(item.dataset.id);
+      const s = history.find(h => h.id === id);
+      if (s) renderHistoryDetail(s);
+    });
+  });
+}
+
+function renderHistoryDetail(s) {
+  viewingHistorySession = s;
+
+  const start = new Date(s.startTime);
+  const end = s.endTime ? new Date(s.endTime) : start;
+  const durMs = end.getTime() - start.getTime();
+
+  $('detail-duration').textContent = 'Duration: ' + formatDuration(durMs) +
+    ' | ' + start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
+    ' ' + start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  const name = s.activeSection;
+  const m = computeMetrics(name, s);
+
+  $('detail-sections').innerHTML = `
+    <div class="summary-section">
+      <div class="summary-section-name">${name}</div>
+      <div class="summary-stats">
+        <span class="label">Count</span><span class="value">${m.count}</span>
+        <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
+        <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
+        <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
+        <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
+      </div>
+    </div>`;
+
+  const sessionDurMin = durMs / 60000;
+  $('detail-totals').innerHTML = `
+    <div class="total-line">Total presses: ${m.count}</div>
+    <div class="total-line">Overall rate: ${sessionDurMin > 0.01 ? (m.count / sessionDurMin).toFixed(1) + '/min' : '--'}</div>
+  `;
+
+  deleteConfirmPending = false;
+  $('detail-delete-btn').textContent = 'Delete';
+  $('detail-delete-btn').classList.remove('confirm');
+
+  showScreen('history-detail');
 }
 
 // === INITIALIZATION ===
@@ -503,7 +644,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Foot pedal
-  document.addEventListener('keydown', Input.handleKeyPress);
+  document.addEventListener('keydown', Input.handleKeyDown);
+  document.addEventListener('keyup', Input.handleKeyUp);
 
   // Section selector on start screen
   document.querySelectorAll('.section-option').forEach(btn => {
@@ -521,9 +663,61 @@ document.addEventListener('DOMContentLoaded', () => {
   // End session
   $('end-btn').addEventListener('click', Input.handleEndSession);
 
+  // Hold-to-end (3 second long press)
+  function startEndHold() {
+    if (!session || !session.active) return;
+    const btn = $('end-btn');
+    btn.classList.remove('filling');
+    void btn.offsetWidth;
+    btn.classList.add('filling');
+    endHoldTimer = setTimeout(() => {
+      endHoldTimer = null;
+      btn.classList.remove('filling');
+      // Cancel any pending double-tap confirmation
+      if (endConfirmPending) {
+        clearTimeout(endConfirmTimer);
+        endConfirmPending = false;
+      }
+      btn.textContent = 'End Session';
+      btn.classList.remove('confirm');
+      // End the session
+      session.active = false;
+      session.endTime = new Date().toISOString();
+      Timer.stop();
+      const sec = session.sections[session.activeSection];
+      const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
+      const durMin = durMs / 60000;
+      const metrics = computeMetrics(session.activeSection);
+      const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
+      const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
+      $('save-discard-stats').innerHTML =
+        `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
+        `<div class="save-discard-details">` +
+          `<span>Rate: ${rate}</span>` +
+          `<span>Avg: ${avg}</span>` +
+          `<span>Total: ${sec.count}</span>` +
+        `</div>`;
+      showScreen('save-discard');
+    }, CONFIRM_TIMEOUT_MS);
+  }
+
+  function cancelEndHold() {
+    if (endHoldTimer) {
+      clearTimeout(endHoldTimer);
+      endHoldTimer = null;
+    }
+    $('end-btn').classList.remove('filling');
+  }
+
+  $('end-btn').addEventListener('pointerdown', startEndHold);
+  $('end-btn').addEventListener('pointerup', cancelEndHold);
+  $('end-btn').addEventListener('pointerleave', cancelEndHold);
+  $('end-btn').addEventListener('pointercancel', cancelEndHold);
+
   // Save session from save/discard screen
   $('save-btn').addEventListener('click', () => {
     Storage.save(session);
+    Storage.saveToHistory(session);
     UI.renderSummary();
     showScreen('summary');
   });
@@ -545,6 +739,68 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
     $('start-btn').disabled = true;
     showScreen('start');
+  });
+
+  // View history
+  $('history-btn').addEventListener('click', () => {
+    renderHistoryList();
+    showScreen('history');
+  });
+
+  // History back
+  $('history-back-btn').addEventListener('click', () => {
+    showScreen('start');
+  });
+
+  // History clear all (double-tap confirmation)
+  $('history-clear-btn').addEventListener('click', () => {
+    if (!clearConfirmPending) {
+      clearConfirmPending = true;
+      $('history-clear-btn').textContent = 'Confirm?';
+      $('history-clear-btn').classList.add('confirm');
+      clearConfirmTimer = setTimeout(() => {
+        clearConfirmPending = false;
+        $('history-clear-btn').textContent = 'Clear All';
+        $('history-clear-btn').classList.remove('confirm');
+      }, CONFIRM_TIMEOUT_MS);
+      return;
+    }
+    clearTimeout(clearConfirmTimer);
+    clearConfirmPending = false;
+    $('history-clear-btn').textContent = 'Clear All';
+    $('history-clear-btn').classList.remove('confirm');
+    Storage.clearHistory();
+    renderHistoryList();
+  });
+
+  // History detail back
+  $('detail-back-btn').addEventListener('click', () => {
+    renderHistoryList();
+    showScreen('history');
+  });
+
+  // History detail delete (double-tap confirmation)
+  $('detail-delete-btn').addEventListener('click', () => {
+    if (!viewingHistorySession) return;
+    if (!deleteConfirmPending) {
+      deleteConfirmPending = true;
+      $('detail-delete-btn').textContent = 'Confirm?';
+      $('detail-delete-btn').classList.add('confirm');
+      deleteConfirmTimer = setTimeout(() => {
+        deleteConfirmPending = false;
+        $('detail-delete-btn').textContent = 'Delete';
+        $('detail-delete-btn').classList.remove('confirm');
+      }, CONFIRM_TIMEOUT_MS);
+      return;
+    }
+    clearTimeout(deleteConfirmTimer);
+    deleteConfirmPending = false;
+    $('detail-delete-btn').textContent = 'Delete';
+    $('detail-delete-btn').classList.remove('confirm');
+    Storage.deleteFromHistory(viewingHistorySession.id);
+    viewingHistorySession = null;
+    renderHistoryList();
+    showScreen('history');
   });
 
   // Periodic save

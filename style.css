@@ -70,7 +70,7 @@ html, body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 12px;
   padding: 24px;
 }
 
@@ -88,11 +88,35 @@ html, body {
 .btn-start {
   background: #0f3460;
   color: #fff;
-  padding: 24px 80px;
-  font-size: 26px;
+  padding: 28px 20px;
+  font-size: 30px;
   border: 2px solid #6367FF;
   border-radius: 12px;
-  margin-top: 24px;
+  margin-top: 8px;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+  width: 100%;
+  max-width: 720px;
+}
+
+.btn-start::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #6367FF;
+  transform: scaleX(0);
+  transform-origin: left;
+  z-index: -1;
+}
+
+.btn-start.filling::after {
+  animation: btn-fill 1750ms linear forwards;
+}
+
+@keyframes btn-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 .btn-start:active {
@@ -115,20 +139,20 @@ html, body {
 /* === SECTION SELECTOR (start screen) === */
 .section-selector {
   display: flex;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
-  max-width: 500px;
+  max-width: 720px;
 }
 
 .section-option {
   flex: 1;
-  padding: 28px 20px;
-  border: 2px solid #16213e;
-  border-radius: 12px;
+  padding: 60px 20px;
+  border: 3px solid #16213e;
+  border-radius: 16px;
   background: #16213e;
   color: #888;
-  font-size: 22px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
   transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -275,6 +299,32 @@ html, body {
   padding: 14px 0;
   font-size: 18px;
   border: 1px solid #6367FF44;
+  position: relative;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.btn-end::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #6367FF;
+  transform: scaleX(0);
+  transform-origin: left;
+  z-index: -1;
+}
+
+.btn-end.filling {
+  color: #fff;
+}
+
+.btn-end.filling::after {
+  animation: end-btn-fill 3000ms linear forwards;
+}
+
+@keyframes end-btn-fill {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 .btn-end:active {
@@ -435,4 +485,129 @@ html, body {
 
 .shake {
   animation: shake 0.4s ease-out;
+}
+
+/* === VIEW HISTORY BUTTON (start screen) === */
+.btn-history {
+  background: rgba(99, 103, 255, 0.12);
+  border: 2px solid #6367FF;
+  color: #6367FF;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 10px 32px;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+
+.btn-history:active {
+  background: rgba(99, 103, 255, 0.25);
+  color: #8a8eff;
+}
+
+/* === HISTORY SCREEN === */
+#history-header, #history-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background: #0f3460;
+  border-bottom: 2px solid #6367FF;
+  flex-shrink: 0;
+}
+
+#history-header span, #history-detail-header span {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.hist-btn {
+  background: transparent;
+  border: none;
+  color: #6367FF;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  padding: 8px 12px;
+  border-radius: 6px;
+}
+
+.hist-btn:active {
+  background: #16213e;
+}
+
+.hist-btn-danger {
+  color: #888;
+}
+
+.hist-btn-danger.confirm {
+  color: #ff6b6b;
+}
+
+#history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.history-item {
+  background: #16213e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s;
+}
+
+.history-item:active {
+  background: #1a2744;
+}
+
+.history-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.history-item-date {
+  font-size: 14px;
+  color: #aaa;
+}
+
+.history-item-section {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6367FF;
+}
+
+.history-item-stats {
+  font-size: 13px;
+  color: #777;
+}
+
+#history-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 16px;
+}
+
+/* === HISTORY DETAIL === */
+#history-detail-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  -webkit-overflow-scrolling: touch;
 }

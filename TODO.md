@@ -12,7 +12,7 @@
 
 ## Recommendations
 
-- [ ] **Session history** — Persist completed sessions to localStorage (or IndexedDB) so the user can review past sessions, not just the most recent one. This also supports the stats/normalized performance feature.
+- [x] **Session history** — Persist completed sessions to localStorage (or IndexedDB) so the user can review past sessions, not just the most recent one. This also supports the stats/normalized performance feature.
 - [ ] **Export data** — Allow exporting session data as CSV or JSON for external analysis.
 - [ ] **Configurable alert thresholds** — Let the user set the warning (currently 45s) and alert (currently 60s) thresholds instead of hardcoding them.
 - [ ] **Target pace mode** — Set a target presses-per-minute and show a visual indicator of whether the user is above or below pace.

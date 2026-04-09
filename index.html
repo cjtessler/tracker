@@ -20,6 +20,7 @@
         <button class="section-option" data-section="PVSI">PVSI</button>
       </div>
       <button id="start-btn" class="btn btn-start" disabled>Tap to Start Session</button>
+      <button id="history-btn" class="btn-history">View History</button>
       <div id="last-session-info" class="last-session-info" style="display:none;"></div>
     </div>
   </div>
@@ -96,7 +97,34 @@
       <div id="summary-duration" class="summary-duration"></div>
       <div id="summary-sections"></div>
       <div id="summary-totals" class="summary-totals"></div>
-      <button id="new-session-btn" class="btn btn-start" style="margin-top:16px;">New Session</button>
+      <button id="new-session-btn" class="btn btn-start" style="margin-top:16px;width:100%;">New Session</button>
+    </div>
+  </div>
+
+  <!-- ==================== HISTORY SCREEN ==================== -->
+  <div id="history-screen" class="screen" style="display:none;">
+    <div id="history-header">
+      <button id="history-back-btn" class="hist-btn">&larr; Back</button>
+      <span>Session History</span>
+      <button id="history-clear-btn" class="hist-btn hist-btn-danger">Clear All</button>
+    </div>
+    <div id="history-list"></div>
+    <div id="history-empty" style="display:none;">
+      <p>No saved sessions yet.</p>
+    </div>
+  </div>
+
+  <!-- ==================== HISTORY DETAIL SCREEN ==================== -->
+  <div id="history-detail-screen" class="screen" style="display:none;">
+    <div id="history-detail-header">
+      <button id="detail-back-btn" class="hist-btn">&larr; Back</button>
+      <span>Session Detail</span>
+      <button id="detail-delete-btn" class="hist-btn hist-btn-danger">Delete</button>
+    </div>
+    <div id="history-detail-body">
+      <div id="detail-duration" class="summary-duration"></div>
+      <div id="detail-sections"></div>
+      <div id="detail-totals" class="summary-totals"></div>
     </div>
   </div>
 
