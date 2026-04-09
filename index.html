@@ -17,11 +17,11 @@
       <h1>Pedal Tracker</h1>
       <p class="start-subtitle">Track presses across CB-105, PVS, and PVSI</p>
       <div id="section-selector" class="section-selector">
-        <button class="section-option active" data-section="CB-105">CB-105</button>
+        <button class="section-option" data-section="CB-105">CB-105</button>
         <button class="section-option" data-section="PVS">PVS</button>
         <button class="section-option" data-section="PVSI">PVSI</button>
       </div>
-      <button id="start-btn" class="btn btn-start">Tap to Start Session</button>
+      <button id="start-btn" class="btn btn-start" disabled>Tap to Start Session</button>
       <div id="last-session-info" class="last-session-info" style="display:none;"></div>
     </div>
   </div>
@@ -43,7 +43,6 @@
     <!-- Session header (locked section) -->
     <div id="session-header">
       <span id="session-section-name">CB-105</span>
-      <span id="session-section-count" class="session-count">0</span>
     </div>
 
     <!-- Timer display -->
@@ -74,14 +73,20 @@
       <button id="end-btn" class="btn btn-end">End Session</button>
     </div>
 
-    <!-- Status bar -->
-    <div id="status-bar">
-      <span id="status-text"></span>
-    </div>
-
     <!-- Audio unlock banner (shown when restoring session) -->
     <div id="audio-banner" style="display:none;">Tap anywhere to enable audio</div>
 
+  </div>
+
+  <!-- ==================== SAVE/DISCARD SCREEN ==================== -->
+  <div id="save-discard-screen" class="screen" style="display:none;">
+    <div class="start-content">
+      <h1>End Session</h1>
+      <p class="start-subtitle">Would you like to save or discard this session?</p>
+      <div id="save-discard-stats" class="save-discard-stats"></div>
+      <button id="save-btn" class="btn btn-start">Save Session</button>
+      <button id="discard-session-btn" class="btn btn-end" style="margin-top:12px;">Discard</button>
+    </div>
   </div>
 
   <!-- ==================== SUMMARY SCREEN ==================== -->

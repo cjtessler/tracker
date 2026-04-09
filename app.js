@@ -15,7 +15,7 @@ let endConfirmTimer = null;
 let endConfirmPending = false;
 let audioCtx = null;
 let statusTimeout = null;
-let selectedSection = 'CB-105';
+let selectedSection = null;
 
 // === DOM REFS ===
 const $ = (id) => document.getElementById(id);
@@ -195,35 +195,30 @@ const Timer = {
 const UI = {
   render() {
     if (!session) return;
-    UI.renderTabs();
+    UI.updateSessionHeader();
     UI.renderStats();
     UI.renderUndoState();
   },
 
-  renderTabs() {
-    SECTIONS.forEach(name => {
-      const tab = document.querySelector(`.tab[data-section="${name}"]`);
-      const countEl = $('count-' + name);
-      countEl.textContent = session.sections[name].count;
-      tab.classList.toggle('active', name === session.activeSection);
-    });
+  updateSessionHeader() {
+    $('session-section-name').textContent = session.activeSection;
   },
 
   renderStats() {
     const metrics = computeMetrics(session.activeSection);
     const sessionStart = new Date(session.startTime).getTime();
     const sessionDurMin = (Date.now() - sessionStart) / 60000;
-    const totalCount = SECTIONS.reduce((s, n) => s + session.sections[n].count, 0);
+    const count = session.sections[session.activeSection].count;
 
     $('stat-rate').textContent = sessionDurMin > 0.01
-      ? (totalCount / sessionDurMin).toFixed(1) + '/min'
+      ? (count / sessionDurMin).toFixed(1) + '/min'
       : '--/min';
 
     $('stat-avg').textContent = metrics.intervals.length > 0
       ? formatDuration(metrics.avgInterval)
       : '--';
 
-    $('stat-total').textContent = totalCount;
+    $('stat-total').textContent = count;
   },
 
   renderUndoState() {
@@ -239,13 +234,7 @@ const UI = {
   },
 
   showStatus(msg) {
-    const el = $('status-text');
-    el.textContent = msg;
-    el.classList.remove('fade-out');
-    if (statusTimeout) clearTimeout(statusTimeout);
-    statusTimeout = setTimeout(() => {
-      el.classList.add('fade-out');
-    }, 2000);
+    // status bar removed
   },
 
   renderSummary() {
@@ -256,32 +245,25 @@ const UI = {
     $('summary-duration').textContent = 'Duration: ' + formatDuration(durMs) +
       ' | Ended: ' + new Date(sessionEnd).toLocaleTimeString();
 
-    let totalCount = 0;
-    let sectionsHtml = '';
+    const name = session.activeSection;
+    const m = computeMetrics(name);
 
-    SECTIONS.forEach(name => {
-      const m = computeMetrics(name);
-      totalCount += m.count;
-
-      sectionsHtml += `
-        <div class="summary-section">
-          <div class="summary-section-name">${name}</div>
-          <div class="summary-stats">
-            <span class="label">Count</span><span class="value">${m.count}</span>
-            <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
-            <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
-            <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
-            <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
-          </div>
-        </div>`;
-    });
-
-    $('summary-sections').innerHTML = sectionsHtml;
+    $('summary-sections').innerHTML = `
+      <div class="summary-section">
+        <div class="summary-section-name">${name}</div>
+        <div class="summary-stats">
+          <span class="label">Count</span><span class="value">${m.count}</span>
+          <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
+          <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
+          <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
+          <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
+        </div>
+      </div>`;
 
     const sessionDurMin = durMs / 60000;
     $('summary-totals').innerHTML = `
-      <div class="total-line">Total presses: ${totalCount}</div>
-      <div class="total-line">Overall rate: ${sessionDurMin > 0.01 ? (totalCount / sessionDurMin).toFixed(1) + '/min' : '--'}</div>
+      <div class="total-line">Total presses: ${m.count}</div>
+      <div class="total-line">Overall rate: ${sessionDurMin > 0.01 ? (m.count / sessionDurMin).toFixed(1) + '/min' : '--'}</div>
     `;
   }
 };
@@ -289,8 +271,24 @@ const UI = {
 // === INPUT HANDLERS ===
 const Input = {
   handleKeyPress(e) {
-    if (e.key !== 'b' || e.repeat || !session || !session.active) return;
+    if (e.key !== 'b' || e.repeat) return;
     e.preventDefault();
+
+    // B on start screen → start session (or nudge if no section)
+    if (!session || !session.active) {
+      if ($('start-screen').style.display !== 'none') {
+        if (!selectedSection) {
+          nudgeSectionSelector();
+          return;
+        }
+        SoundPlayer.init();
+        session = createSession();
+        Storage.save(session);
+        showScreen('session');
+        Timer.start();
+      }
+      return;
+    }
     const now = Date.now();
     if (now - lastPressTime < DEBOUNCE_MS) return;
     lastPressTime = now;
@@ -332,14 +330,6 @@ const Input = {
     UI.showStatus('Undone \u2014 ' + last.section);
   },
 
-  handleTabSwitch(sectionName) {
-    if (!session || session.activeSection === sectionName) return;
-    session.activeSection = sectionName;
-    lastAlertedMinute = 0;
-    Storage.save(session);
-    UI.render();
-  },
-
   handleEndSession() {
     if (!session || !session.active) return;
 
@@ -357,21 +347,28 @@ const Input = {
       return;
     }
 
-    // Second tap — end session
+    // Second tap — show save/discard prompt
     clearTimeout(endConfirmTimer);
     endConfirmPending = false;
+    $('end-btn').textContent = 'End Session';
+    $('end-btn').classList.remove('confirm');
     session.active = false;
     session.endTime = new Date().toISOString();
     Timer.stop();
-    Storage.save(session);
-    UI.renderSummary();
-    showScreen('summary');
+
+    // Show quick stats on save/discard screen
+    const sec = session.sections[session.activeSection];
+    const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
+    $('save-discard-stats').innerHTML =
+      `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>`;
+
+    showScreen('save-discard');
   }
 };
 
 // === SCREEN MANAGEMENT ===
 function showScreen(name) {
-  ['start-screen', 'resume-screen', 'session-screen', 'summary-screen'].forEach(id => {
+  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
@@ -391,6 +388,18 @@ function formatDuration(ms) {
   return hr + 'h ' + remMin + 'm';
 }
 
+// === NUDGE ===
+function nudgeSectionSelector() {
+  SoundPlayer.init();
+  SoundPlayer.playTone(220, 0.15, 0);
+  SoundPlayer.playTone(180, 0.15, 0.18);
+  const el = $('section-selector');
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  el.addEventListener('animationend', () => el.classList.remove('shake'), { once: true });
+}
+
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', () => {
   // Check for saved session
@@ -405,11 +414,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const gapMin = Math.round(gap / 60000);
       $('resume-info').textContent =
         `Last activity was ${gapMin} minutes ago. Resume or start fresh?`;
+      $('resume-section').textContent = `Section: ${saved.activeSection}`;
       showScreen('resume');
 
       $('resume-btn').addEventListener('click', () => {
         SoundPlayer.init();
         session = saved;
+        UI.updateSessionHeader();
         showScreen('session');
         Timer.start();
         showAudioBanner();
@@ -417,12 +428,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
       $('discard-btn').addEventListener('click', () => {
         Storage.clear();
+        selectedSection = null;
+        document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
+        $('start-btn').disabled = true;
         showScreen('start');
       });
     } else {
       // Auto-resume recent session
       session = saved;
       SoundPlayer.init();
+      UI.updateSessionHeader();
       showScreen('session');
       Timer.start();
       showAudioBanner();
@@ -433,6 +448,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Start button
   $('start-btn').addEventListener('click', () => {
+    if (!selectedSection) {
+      nudgeSectionSelector();
+      return;
+    }
     SoundPlayer.init();
     session = createSession();
     Storage.save(session);
@@ -443,10 +462,13 @@ document.addEventListener('DOMContentLoaded', () => {
   // Foot pedal
   document.addEventListener('keydown', Input.handleKeyPress);
 
-  // Tab switches
-  document.querySelectorAll('.tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-      Input.handleTabSwitch(tab.dataset.section);
+  // Section selector on start screen
+  document.querySelectorAll('.section-option').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedSection = btn.dataset.section;
+      $('start-btn').disabled = false;
     });
   });
 
@@ -456,9 +478,29 @@ document.addEventListener('DOMContentLoaded', () => {
   // End session
   $('end-btn').addEventListener('click', Input.handleEndSession);
 
+  // Save session from save/discard screen
+  $('save-btn').addEventListener('click', () => {
+    Storage.save(session);
+    UI.renderSummary();
+    showScreen('summary');
+  });
+
+  // Discard session from save/discard screen
+  $('discard-session-btn').addEventListener('click', () => {
+    Storage.clear();
+    session = null;
+    selectedSection = null;
+    document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
+    $('start-btn').disabled = true;
+    showScreen('start');
+  });
+
   // New session from summary
   $('new-session-btn').addEventListener('click', () => {
     Storage.clear();
+    selectedSection = null;
+    document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
+    $('start-btn').disabled = true;
     showScreen('start');
   });
 

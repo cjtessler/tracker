@@ -4,7 +4,7 @@
 
 - [ ] **Pause timer** — Add a pause/resume button so the user can pause the elapsed timer (e.g., during breaks) without ending the session. Paused time should not count toward rate calculations.
 - [ ] **Mute alerts** — Add a toggle to mute both audio alerts (minute beeps, press clicks) and visual alerts (flash overlay, timer color pulsing). Persist the mute preference across sessions.
-- [ ] **Calmer color palette** — Replace the high-contrast red (`#e94560`) and neon green (`#00ff88`) accents with softer, muted tones. Reduce the intensity of the timer warning/alert states and the flash overlay.
+- [x] **Calmer color palette** — Replace the high-contrast red (`#e94560`) and neon green (`#00ff88`) accents with softer, muted tones. Reduce the intensity of the timer warning/alert states and the flash overlay.
 - [ ] **Widgets** — Add configurable widgets to the session screen (e.g., session elapsed time, per-section mini charts, interval trend indicator, target pace tracker).
 - [ ] **Stats from main page** — Add a "View Stats" button on the start screen that opens a stats view showing historical review session data and normalized performance metrics (presses/min adjusted for pauses, consistency scores, section-by-section comparisons across sessions).
 
