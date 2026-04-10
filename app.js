@@ -344,9 +344,14 @@ const UI = {
     const sessionDurMin = (Date.now() - sessionStart) / 60000;
     const count = session.sections[session.activeSection].count;
 
-    $('stat-rate').textContent = sessionDurMin > 0.01
-      ? (count / sessionDurMin).toFixed(1) + '/min'
+    const perMin = sessionDurMin > 0.01 ? count / sessionDurMin : 0;
+    $('stat-rate').textContent = perMin > 0
+      ? perMin.toFixed(1) + '/min'
       : '--/min';
+
+    $('stat-rate-hr').textContent = perMin > 0
+      ? Math.round(perMin * 60) + '/hr'
+      : '--/hr';
 
     $('stat-avg').textContent = metrics.intervals.length > 0
       ? formatDuration(metrics.avgInterval)
@@ -375,30 +380,32 @@ const UI = {
     const sessionStart = new Date(session.startTime).getTime();
     const sessionEnd = session.endTime ? new Date(session.endTime).getTime() : Date.now();
     const durMs = sessionEnd - sessionStart;
-
-    $('summary-duration').textContent = 'Duration: ' + formatDuration(durMs) +
-      ' | Ended: ' + new Date(sessionEnd).toLocaleTimeString();
+    const durMin = durMs / 60000;
+    const startTime = new Date(sessionStart).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const endTime = new Date(sessionEnd).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
     const name = session.activeSection;
     const m = computeMetrics(name);
+    const perHour = durMin > 0.01 ? Math.round(m.count / durMin * 60) + '/hr' : '--';
+    const overallRate = durMin > 0.01 ? (m.count / durMin).toFixed(1) + '/min' : '--';
 
     $('summary-sections').innerHTML = `
       <div class="summary-section">
         <div class="summary-section-name">${name}</div>
+        <div class="summary-meta">
+          <span>${startTime} &ndash; ${endTime}</span>
+          <span>${formatDuration(durMs)}</span>
+        </div>
         <div class="summary-stats">
           <span class="label">Count</span><span class="value">${m.count}</span>
+          <span class="label">Per hour</span><span class="value">${perHour}</span>
           <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
           <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
           <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
           <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
+          <span class="label">Overall rate</span><span class="value">${overallRate}</span>
         </div>
       </div>`;
-
-    const sessionDurMin = durMs / 60000;
-    $('summary-totals').innerHTML = `
-      <div class="total-line">Total presses: ${m.count}</div>
-      <div class="total-line">Overall rate: ${sessionDurMin > 0.01 ? (m.count / sessionDurMin).toFixed(1) + '/min' : '--'}</div>
-    `;
   }
 };
 
@@ -436,10 +443,46 @@ const Input = {
       }
       return;
     }
+    // Active session → tap records press, hold ends session
     const now = Date.now();
     if (now - lastPressTime < DEBOUNCE_MS) return;
     lastPressTime = now;
-    Input.recordPress(now);
+
+    bHoldFired = false;
+    const endBtn = $('end-btn');
+    bFillTimer = setTimeout(() => {
+      endBtn.classList.remove('filling');
+      void endBtn.offsetWidth;
+      endBtn.classList.add('filling');
+    }, HOLD_DELAY_MS);
+
+    bHoldTimer = setTimeout(() => {
+      bHoldFired = true;
+      endBtn.classList.remove('filling');
+      if (endConfirmPending) {
+        clearTimeout(endConfirmTimer);
+        endConfirmPending = false;
+      }
+      endBtn.textContent = 'End Session';
+      endBtn.classList.remove('confirm');
+      session.active = false;
+      session.endTime = new Date().toISOString();
+      Timer.stop();
+      const sec = session.sections[session.activeSection];
+      const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
+      const durMin = durMs / 60000;
+      const metrics = computeMetrics(session.activeSection);
+      const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
+      const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
+      $('save-discard-stats').innerHTML =
+        `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
+        `<div class="save-discard-details">` +
+          `<span>Rate: ${rate}</span>` +
+          `<span>Avg: ${avg}</span>` +
+          `<span>Total: ${sec.count}</span>` +
+        `</div>`;
+      showScreen('save-discard');
+    }, HOLD_THRESHOLD_MS);
   },
 
   handleKeyUp(e) {
@@ -453,9 +496,14 @@ const Input = {
       bHoldTimer = null;
     }
     $('start-btn').classList.remove('filling');
-    if (!bHoldFired && (!session || !session.active)) {
-      if ($('start-screen').style.display !== 'none') {
-        cycleSection();
+    $('end-btn').classList.remove('filling');
+    if (!bHoldFired) {
+      if (!session || !session.active) {
+        if ($('start-screen').style.display !== 'none') {
+          cycleSection();
+        }
+      } else {
+        Input.recordPress(lastPressTime);
       }
     }
   },
@@ -542,7 +590,7 @@ const Input = {
 
 // === SCREEN MANAGEMENT ===
 function showScreen(name) {
-  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen'].forEach(id => {
+  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen', 'stats-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
@@ -649,18 +697,26 @@ function renderHistoryDetail(s) {
   const end = s.endTime ? new Date(s.endTime) : start;
   const durMs = end.getTime() - start.getTime();
 
-  $('detail-duration').textContent = 'Duration: ' + formatDuration(durMs) +
-    ' | ' + start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) +
-    ' ' + start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  const durMin = durMs / 60000;
+  const startTime = start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const endTime = end.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const dateStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  $('detail-duration').innerHTML =
+    `<span>${dateStr}</span>` +
+    `<span>${startTime} &ndash; ${endTime}</span>` +
+    `<span>${formatDuration(durMs)}</span>`;
 
   const name = s.activeSection;
   const m = computeMetrics(name, s);
+  const perHour = durMin > 0.01 ? Math.round(m.count / durMin * 60) + '/hr' : '--';
 
   $('detail-sections').innerHTML = `
     <div class="summary-section">
       <div class="summary-section-name">${name}</div>
       <div class="summary-stats">
         <span class="label">Count</span><span class="value">${m.count}</span>
+        <span class="label">Per hour</span><span class="value">${perHour}</span>
         <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
         <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
         <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
@@ -668,10 +724,9 @@ function renderHistoryDetail(s) {
       </div>
     </div>`;
 
-  const sessionDurMin = durMs / 60000;
   $('detail-totals').innerHTML = `
     <div class="total-line">Total presses: ${m.count}</div>
-    <div class="total-line">Overall rate: ${sessionDurMin > 0.01 ? (m.count / sessionDurMin).toFixed(1) + '/min' : '--'}</div>
+    <div class="total-line">Overall rate: ${durMin > 0.01 ? (m.count / durMin).toFixed(1) + '/min' : '--'}</div>
   `;
 
   deleteConfirmPending = false;
@@ -795,7 +850,7 @@ document.addEventListener('DOMContentLoaded', () => {
           `<span>Total: ${sec.count}</span>` +
         `</div>`;
       showScreen('save-discard');
-    }, CONFIRM_TIMEOUT_MS);
+    }, HOLD_THRESHOLD_MS);
   }
 
   function cancelEndHold() {
@@ -938,4 +993,204 @@ function showAudioBanner() {
   };
   document.addEventListener('click', unlock);
   document.addEventListener('touchstart', unlock);
+}
+
+// === STATS CHART ===
+let statsQueue = 'CB-105';
+
+function renderStatsChart() {
+  const history = Storage.loadHistory();
+  const sessions = history.filter(s => s.activeSection === statsQueue && s.endTime);
+
+  const canvas = $('stats-canvas');
+  const wrap = $('stats-chart-wrap');
+  const emptyEl = $('stats-empty');
+
+  if (sessions.length === 0) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'flex';
+    return;
+  }
+  canvas.style.display = 'block';
+  emptyEl.style.display = 'none';
+
+  // Build data points: { date (day string), time (ms), perHour }
+  const points = [];
+  sessions.forEach(s => {
+    const start = new Date(s.startTime).getTime();
+    const end = new Date(s.endTime).getTime();
+    const durMin = (end - start) / 60000;
+    if (durMin < 0.5) return; // skip very short sessions
+    const count = s.sections[s.activeSection].count;
+    const perHour = Math.round(count / durMin * 60);
+    points.push({ time: start, perHour });
+  });
+
+  if (points.length === 0) {
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'flex';
+    return;
+  }
+
+  points.sort((a, b) => a.time - b.time);
+
+  // Group by day
+  const dayMap = new Map();
+  points.forEach(p => {
+    const d = new Date(p.time);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (!dayMap.has(key)) dayMap.set(key, []);
+    dayMap.get(key).push(p);
+  });
+  const days = Array.from(dayMap.keys()).sort();
+
+  // Chart dimensions
+  const dpr = window.devicePixelRatio || 1;
+  const chartHeight = wrap.clientHeight - 4;
+  const padTop = 32;
+  const padBottom = 44;
+  const padLeft = 52;
+  const padRight = 20;
+  const dayWidth = 140;
+  const totalDays = days.length;
+  const chartWidth = Math.max(800, padLeft + padRight + totalDays * dayWidth);
+
+  canvas.width = chartWidth * dpr;
+  canvas.height = chartHeight * dpr;
+  canvas.style.width = chartWidth + 'px';
+  canvas.style.height = chartHeight + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  // Clear
+  ctx.clearRect(0, 0, chartWidth, chartHeight);
+
+  const plotTop = padTop;
+  const plotBottom = chartHeight - padBottom;
+  const plotHeight = plotBottom - plotTop;
+  const plotLeft = padLeft;
+
+  // Y-axis range
+  const allRates = points.map(p => p.perHour);
+  const maxRate = Math.max(...allRates);
+  const yMax = Math.ceil(maxRate / 10) * 10 || 10;
+  const ySteps = 5;
+  const yStep = yMax / ySteps;
+
+  // Grid lines and Y labels
+  ctx.strokeStyle = '#1a2744';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = '#666';
+  ctx.font = '12px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+
+  for (let i = 0; i <= ySteps; i++) {
+    const val = Math.round(i * yStep);
+    const y = plotBottom - (i / ySteps) * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, y);
+    ctx.lineTo(chartWidth - padRight, y);
+    ctx.stroke();
+    ctx.fillText(val + '/hr', plotLeft - 6, y);
+  }
+
+  // X positions: each day gets a column
+  function dayX(dayIdx) {
+    return plotLeft + dayIdx * dayWidth + dayWidth / 2;
+  }
+
+  // Day labels on X axis
+  ctx.fillStyle = '#888';
+  ctx.font = '12px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  days.forEach((day, i) => {
+    const x = dayX(i);
+    const d = new Date(day + 'T12:00:00');
+    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    ctx.fillText(label, x, plotBottom + 6);
+
+    // Day divider
+    ctx.strokeStyle = '#16213e';
+    ctx.beginPath();
+    ctx.moveTo(x, plotTop);
+    ctx.lineTo(x, plotBottom);
+    ctx.stroke();
+  });
+
+  // Plot points and lines — spread sessions within a day
+  function yPos(rate) {
+    return plotBottom - (rate / yMax) * plotHeight;
+  }
+
+  // Build flat list of { x, y, perHour } for the line
+  const plotPoints = [];
+  days.forEach((day, di) => {
+    const daySessions = dayMap.get(day);
+    daySessions.sort((a, b) => a.time - b.time);
+    const cx = dayX(di);
+
+    if (daySessions.length === 1) {
+      plotPoints.push({ x: cx, y: yPos(daySessions[0].perHour), perHour: daySessions[0].perHour });
+    } else {
+      const spread = Math.min(dayWidth * 0.7, daySessions.length * 20);
+      const startX = cx - spread / 2;
+      daySessions.forEach((p, j) => {
+        const x = startX + (spread * j) / (daySessions.length - 1);
+        plotPoints.push({ x, y: yPos(p.perHour), perHour: p.perHour });
+      });
+    }
+  });
+
+  // Draw line
+  if (plotPoints.length > 1) {
+    ctx.strokeStyle = '#6367FF';
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(plotPoints[0].x, plotPoints[0].y);
+    for (let i = 1; i < plotPoints.length; i++) {
+      ctx.lineTo(plotPoints[i].x, plotPoints[i].y);
+    }
+    ctx.stroke();
+
+    // Fill area under the line
+    ctx.fillStyle = 'rgba(99, 103, 255, 0.1)';
+    ctx.beginPath();
+    ctx.moveTo(plotPoints[0].x, plotBottom);
+    plotPoints.forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.lineTo(plotPoints[plotPoints.length - 1].x, plotBottom);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Draw dots + value labels
+  plotPoints.forEach(p => {
+    ctx.fillStyle = '#6367FF';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Value label above dot
+    ctx.fillStyle = '#ccc';
+    ctx.font = '11px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(p.perHour, p.x, p.y - 8);
+  });
+
+  // Scroll to show last 5 days
+  if (totalDays > 5) {
+    const scrollTarget = dayX(totalDays - 5) - padLeft - 20;
+    wrap.scrollLeft = Math.max(0, scrollTarget);
+  } else {
+    wrap.scrollLeft = 0;
+  }
 }

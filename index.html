@@ -20,7 +20,10 @@
         <button class="section-option" data-section="PVSI">PVSI</button>
       </div>
       <button id="start-btn" class="btn btn-start" disabled>Tap to Start Session</button>
-      <button id="history-btn" class="btn-history">View History</button>
+      <div class="start-actions">
+        <button id="stats-btn" class="btn-history">Stats</button>
+        <button id="history-btn" class="btn-history">History</button>
+      </div>
       <div id="last-session-info" class="last-session-info" style="display:none;"></div>
     </div>
   </div>
@@ -55,6 +58,10 @@
       <div class="stat">
         <span class="stat-label">Rate</span>
         <span class="stat-value" id="stat-rate">--/min</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">Per Hour</span>
+        <span class="stat-value" id="stat-rate-hr">--/hr</span>
       </div>
       <div class="stat">
         <span class="stat-label">Avg</span>
@@ -93,13 +100,8 @@
   <!-- ==================== SUMMARY SCREEN ==================== -->
   <div id="summary-screen" class="screen" style="display:none;">
     <div id="summary-content">
-      <div class="summary-header">
-        <h2>Session Summary</h2>
-        <div id="summary-duration" class="summary-duration"></div>
-      </div>
       <div id="summary-sections"></div>
-      <div id="summary-totals" class="summary-totals"></div>
-      <button id="new-session-btn" class="btn btn-start" style="margin-top:8px;width:100%;">New Session</button>
+      <button id="new-session-btn" class="btn btn-new-session">New Session</button>
     </div>
   </div>
 
@@ -134,6 +136,26 @@
       <div id="detail-duration" class="summary-duration"></div>
       <div id="detail-sections"></div>
       <div id="detail-totals" class="summary-totals"></div>
+    </div>
+  </div>
+
+  <!-- ==================== STATS SCREEN ==================== -->
+  <div id="stats-screen" class="screen" style="display:none;">
+    <div id="stats-header">
+      <button id="stats-back-btn" class="hist-btn">&larr; Back</button>
+      <span>Stats</span>
+      <span style="width:60px;"></span>
+    </div>
+    <div id="stats-queue-selector">
+      <button class="stats-queue-btn active" data-section="CB-105">CB-105</button>
+      <button class="stats-queue-btn" data-section="PVS">PVS</button>
+      <button class="stats-queue-btn" data-section="PVSI">PVSI</button>
+    </div>
+    <div id="stats-chart-wrap">
+      <canvas id="stats-canvas"></canvas>
+    </div>
+    <div id="stats-empty" style="display:none;">
+      <p>No session data for this queue.</p>
     </div>
   </div>
 

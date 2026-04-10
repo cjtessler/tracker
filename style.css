@@ -215,17 +215,17 @@ html, body {
 }
 
 #timer-value.warning {
-  color: #C9BEFF;
+  color: #FFA726;
 }
 
 #timer-value.alert {
-  color: #FFDBFD;
-  animation: pulse 1s ease-in-out infinite;
+  color: #FF3D3D;
+  animation: pulse 0.8s ease-in-out infinite;
 }
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.75; }
+  50% { opacity: 0.4; }
 }
 
 #timer-label {
@@ -259,7 +259,7 @@ html, body {
 }
 
 .stat-value {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
@@ -319,7 +319,7 @@ html, body {
 }
 
 .btn-end.filling::after {
-  animation: end-btn-fill 3000ms linear forwards;
+  animation: end-btn-fill 1750ms linear forwards;
 }
 
 @keyframes end-btn-fill {
@@ -361,58 +361,74 @@ html, body {
 #summary-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 24px;
+  padding: 24px 24px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 16px;
   -webkit-overflow-scrolling: touch;
 }
 
-.summary-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-}
-
-#summary-content h2 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #6367FF;
-  margin: 0;
-}
 
 .summary-duration {
   font-size: 18px;
   color: #aaa;
+  display: flex;
+  gap: 16px;
 }
 
 .summary-section {
   background: #16213e;
   border-radius: 8px;
-  padding: 10px 16px;
+  padding: 12px 16px;
 }
 
 .summary-section-name {
   font-size: 22px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
   color: #6367FF;
+}
+
+.summary-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  color: #ccc;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #1a2744;
 }
 
 .summary-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 4px 16px;
-  font-size: 20px;
+  gap: 6px 16px;
+  font-size: 22px;
 }
 
 .summary-stats .label {
-  color: #888;
+  color: #bbb;
 }
 
 .summary-stats .value {
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+
+.btn-new-session {
+  background: #0f3460;
+  color: #fff;
+  padding: 18px 20px;
+  font-size: 24px;
+  font-weight: 700;
+  border: 2px solid #6367FF;
+  border-radius: 12px;
+  width: 100%;
+  margin-top: auto;
+}
+
+.btn-new-session:active {
+  background: #16213e;
 }
 
 .summary-totals {
@@ -492,7 +508,13 @@ html, body {
   animation: shake 0.4s ease-out;
 }
 
-/* === VIEW HISTORY BUTTON (start screen) === */
+/* === START SCREEN ACTION BUTTONS === */
+.start-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+
 .btn-history {
   background: rgba(99, 103, 255, 0.12);
   border: 2px solid #6367FF;
@@ -503,7 +525,6 @@ html, body {
   touch-action: manipulation;
   padding: 10px 32px;
   border-radius: 8px;
-  margin-top: 4px;
 }
 
 .btn-history:active {
@@ -651,4 +672,76 @@ html, body {
   flex-direction: column;
   gap: 12px;
   -webkit-overflow-scrolling: touch;
+}
+
+/* === STATS SCREEN === */
+#stats-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px;
+  background: #0f3460;
+  border-bottom: 2px solid #6367FF;
+  flex-shrink: 0;
+}
+
+#stats-header span {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+#stats-queue-selector {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  flex-shrink: 0;
+  background: #1a1a2e;
+}
+
+.stats-queue-btn {
+  flex: 1;
+  padding: 10px 0;
+  border: 2px solid #16213e;
+  border-radius: 8px;
+  background: #16213e;
+  color: #888;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.stats-queue-btn.active {
+  background: #0f3460;
+  color: #fff;
+  border-color: #6367FF;
+}
+
+.stats-queue-btn:not(.active):active {
+  background: #1a2744;
+}
+
+#stats-chart-wrap {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 0 8px 0;
+}
+
+#stats-canvas {
+  display: block;
+  min-width: 100%;
+}
+
+#stats-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  font-size: 16px;
 }
