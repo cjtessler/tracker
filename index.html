@@ -13,11 +13,14 @@
 
   <!-- ==================== START SCREEN ==================== -->
   <div id="start-screen" class="screen">
+    <div id="start-clock" class="clock-bar"></div>
     <div class="start-content">
       <div id="section-selector" class="section-selector">
         <button class="section-option" data-section="CB-105">CB-105</button>
         <button class="section-option" data-section="PVS">PVS</button>
         <button class="section-option" data-section="PVSI">PVSI</button>
+        <button class="section-option" data-section="SMS">SMS</button>
+        <button class="section-option" data-section="OP222">OP222</button>
       </div>
       <button id="start-btn" class="btn btn-start" disabled>Tap to Start Session</button>
       <div class="start-actions">
@@ -42,9 +45,10 @@
   <!-- ==================== SESSION SCREEN ==================== -->
   <div id="session-screen" class="screen" style="display:none;">
 
-    <!-- Session header (locked section) -->
+    <!-- Session header (locked section + clock) -->
     <div id="session-header">
       <span id="session-section-name">CB-105</span>
+      <span id="session-clock" class="session-clock"></span>
     </div>
 
     <!-- Timer display -->
@@ -56,7 +60,7 @@
     <!-- Stats bar -->
     <div id="stats-bar">
       <div class="stat">
-        <span class="stat-label">Rate</span>
+        <span class="stat-label">Per Min</span>
         <span class="stat-value" id="stat-rate">--/min</span>
       </div>
       <div class="stat">
@@ -150,6 +154,8 @@
       <button class="stats-queue-btn active" data-section="CB-105">CB-105</button>
       <button class="stats-queue-btn" data-section="PVS">PVS</button>
       <button class="stats-queue-btn" data-section="PVSI">PVSI</button>
+      <button class="stats-queue-btn" data-section="SMS">SMS</button>
+      <button class="stats-queue-btn" data-section="OP222">OP222</button>
     </div>
     <div id="stats-chart-wrap">
       <canvas id="stats-canvas"></canvas>

@@ -63,6 +63,20 @@ html, body {
   transform: scale(0.96);
 }
 
+/* === CLOCK BAR (start + session screens) === */
+.clock-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 70px;
+  background: #0f3460;
+  border-bottom: 4px solid #6367FF;
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+}
+
 /* === START SCREEN === */
 .start-content {
   flex: 1;
@@ -139,19 +153,19 @@ html, body {
 /* === SECTION SELECTOR (start screen) === */
 .section-selector {
   display: flex;
-  gap: 16px;
+  gap: 10px;
   width: 100%;
   max-width: 720px;
 }
 
 .section-option {
   flex: 1;
-  padding: 60px 20px;
+  padding: 40px 10px;
   border: 3px solid #16213e;
   border-radius: 16px;
   background: #16213e;
   color: #888;
-  font-size: 32px;
+  font-size: 26px;
   font-weight: 700;
   cursor: pointer;
   touch-action: manipulation;
@@ -172,12 +186,18 @@ html, body {
 #session-header {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   height: 70px;
+  padding: 0 24px;
   background: #0f3460;
   border-bottom: 4px solid #6367FF;
-  gap: 16px;
   flex-shrink: 0;
+}
+
+.session-clock {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
 }
 
 #session-section-name {
@@ -402,8 +422,8 @@ html, body {
 .summary-stats {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px 16px;
-  font-size: 22px;
+  gap: 8px 16px;
+  font-size: 26px;
 }
 
 .summary-stats .label {

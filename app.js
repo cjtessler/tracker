@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const SECTIONS = ['CB-105', 'PVS', 'PVSI'];
+const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -219,7 +219,9 @@ function createSession() {
     sections: {
       'CB-105': { count: 0, timestamps: [] },
       'PVS':    { count: 0, timestamps: [] },
-      'PVSI':   { count: 0, timestamps: [] }
+      'PVSI':   { count: 0, timestamps: [] },
+      'SMS':    { count: 0, timestamps: [] },
+      'OP222':  { count: 0, timestamps: [] }
     },
     activeSection: selectedSection,
     active: true,
@@ -387,7 +389,6 @@ const UI = {
     const name = session.activeSection;
     const m = computeMetrics(name);
     const perHour = durMin > 0.01 ? Math.round(m.count / durMin * 60) + '/hr' : '--';
-    const overallRate = durMin > 0.01 ? (m.count / durMin).toFixed(1) + '/min' : '--';
 
     $('summary-sections').innerHTML = `
       <div class="summary-section">
@@ -399,11 +400,10 @@ const UI = {
         <div class="summary-stats">
           <span class="label">Count</span><span class="value">${m.count}</span>
           <span class="label">Per hour</span><span class="value">${perHour}</span>
+          <span class="label">Per min</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
           <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
           <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
           <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
-          <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
-          <span class="label">Overall rate</span><span class="value">${overallRate}</span>
         </div>
       </div>`;
   }
@@ -415,8 +415,13 @@ const Input = {
     if (e.key !== 'b' || e.repeat) return;
     e.preventDefault();
 
-    // B on start screen → tap cycles section, hold starts session
+    // B on save/discard screen → save session
     if (!session || !session.active) {
+      if ($('save-discard-screen').style.display !== 'none') {
+        $('save-btn').click();
+        return;
+      }
+      // B on start screen → tap cycles section, hold starts session
       if ($('start-screen').style.display !== 'none') {
         bHoldFired = false;
         const startBtn = $('start-btn');
@@ -589,12 +594,30 @@ const Input = {
 };
 
 // === SCREEN MANAGEMENT ===
+let clockInterval = null;
+function updateClock() {
+  const now = new Date();
+  const date = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const full = date + '  \u2022  ' + time;
+  $('start-clock').textContent = full;
+  $('session-clock').textContent = date + '  \u2022  ' + time;
+}
+
 function showScreen(name) {
   ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen', 'stats-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
   if (name === 'session') UI.render();
+  if (name === 'start' || name === 'session') {
+    updateClock();
+    clearInterval(clockInterval);
+    clockInterval = setInterval(updateClock, 10000);
+  } else {
+    clearInterval(clockInterval);
+    clockInterval = null;
+  }
 }
 
 // === HELPERS ===
@@ -717,16 +740,15 @@ function renderHistoryDetail(s) {
       <div class="summary-stats">
         <span class="label">Count</span><span class="value">${m.count}</span>
         <span class="label">Per hour</span><span class="value">${perHour}</span>
+        <span class="label">Per min</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
         <span class="label">Avg interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.avgInterval) : '--'}</span>
         <span class="label">Min interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.minInterval) : '--'}</span>
         <span class="label">Max interval</span><span class="value">${m.intervals.length > 0 ? formatDuration(m.maxInterval) : '--'}</span>
-        <span class="label">Rate</span><span class="value">${m.pressesPerMin > 0 ? m.pressesPerMin.toFixed(1) + '/min' : '--'}</span>
       </div>
     </div>`;
 
   $('detail-totals').innerHTML = `
     <div class="total-line">Total presses: ${m.count}</div>
-    <div class="total-line">Overall rate: ${durMin > 0.01 ? (m.count / durMin).toFixed(1) + '/min' : '--'}</div>
   `;
 
   deleteConfirmPending = false;
@@ -961,6 +983,25 @@ document.addEventListener('DOMContentLoaded', () => {
   $('import-file-input').addEventListener('change', (e) => {
     if (e.target.files[0]) Export.fromJSON(e.target.files[0]);
     e.target.value = '';
+  });
+
+  // Stats
+  $('stats-btn').addEventListener('click', () => {
+    renderStatsChart();
+    showScreen('stats');
+  });
+
+  $('stats-back-btn').addEventListener('click', () => {
+    showScreen('start');
+  });
+
+  document.querySelectorAll('.stats-queue-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.stats-queue-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      statsQueue = btn.dataset.section;
+      renderStatsChart();
+    });
   });
 
   // Periodic save
