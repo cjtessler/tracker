@@ -82,6 +82,99 @@ const Storage = {
   }
 };
 
+// === EXPORT / IMPORT ===
+const Export = {
+  _download(content, filename, mime) {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  toJSON() {
+    const history = Storage.loadHistory();
+    const payload = { exportedAt: new Date().toISOString(), version: 1, sessions: history };
+    const date = new Date().toISOString().slice(0, 10);
+    Export._download(JSON.stringify(payload, null, 2), `pedal-tracker-${date}.json`, 'application/json');
+  },
+
+  toCSV() {
+    const history = Storage.loadHistory();
+    const rows = [['id', 'date', 'section', 'count', 'duration_s',
+                    'avg_interval_ms', 'min_interval_ms', 'max_interval_ms', 'rate_per_min']];
+    history.forEach(s => {
+      const start = new Date(s.startTime).getTime();
+      const end = s.endTime ? new Date(s.endTime).getTime() : start;
+      const durMs = end - start;
+      const m = computeMetrics(s.activeSection, s);
+      rows.push([
+        s.id,
+        new Date(s.startTime).toISOString(),
+        s.activeSection,
+        m.count,
+        Math.round(durMs / 1000),
+        m.intervals.length > 0 ? Math.round(m.avgInterval) : '',
+        m.intervals.length > 0 ? m.minInterval : '',
+        m.intervals.length > 0 ? m.maxInterval : '',
+        (durMs / 60000) > 0.01 ? m.pressesPerMin.toFixed(2) : ''
+      ]);
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const date = new Date().toISOString().slice(0, 10);
+    Export._download(csv, `pedal-tracker-${date}.csv`, 'text/csv');
+  },
+
+  fromJSON(file) {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        const incoming = Array.isArray(data) ? data : (data.sessions || []);
+        if (!Array.isArray(incoming)) {
+          Export._showBanner('Invalid backup file.', true);
+          return;
+        }
+        const valid = incoming.filter(s => s && s.id && s.startTime && s.sections);
+        if (valid.length === 0) {
+          Export._showBanner('No valid sessions in file.', true);
+          return;
+        }
+        const existing = Storage.loadHistory();
+        const existingIds = new Set(existing.map(s => s.id));
+        const added = valid.filter(s => !existingIds.has(s.id));
+        const merged = [...added, ...existing];
+        merged.sort((a, b) => b.id - a.id);
+        try {
+          localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+        } catch {
+          Export._showBanner('Storage full — import failed.', true);
+          return;
+        }
+        Export._showBanner(added.length === 0
+          ? 'Already up to date.'
+          : `Imported ${added.length} new session(s).`);
+        renderHistoryList();
+      } catch {
+        Export._showBanner('Could not parse file.', true);
+      }
+    };
+    reader.readAsText(file);
+  },
+
+  _bannerTimer: null,
+  _showBanner(msg, isError = false) {
+    const banner = $('history-banner');
+    banner.textContent = msg;
+    banner.className = isError ? 'error' : '';
+    banner.style.display = 'block';
+    clearTimeout(Export._bannerTimer);
+    Export._bannerTimer = setTimeout(() => { banner.style.display = 'none'; }, 3000);
+  }
+};
+
 // === AUDIO ===
 const SoundPlayer = {
   init() {
@@ -508,12 +601,16 @@ function renderHistoryList() {
     list.style.display = 'none';
     empty.style.display = 'flex';
     $('history-clear-btn').style.display = 'none';
+    $('export-json-btn').style.display = 'none';
+    $('export-csv-btn').style.display = 'none';
     return;
   }
 
   list.style.display = 'block';
   empty.style.display = 'none';
   $('history-clear-btn').style.display = 'block';
+  $('export-json-btn').style.display = '';
+  $('export-csv-btn').style.display = '';
 
   list.innerHTML = history.map(s => {
     const start = new Date(s.startTime);
@@ -801,6 +898,14 @@ document.addEventListener('DOMContentLoaded', () => {
     viewingHistorySession = null;
     renderHistoryList();
     showScreen('history');
+  });
+
+  // Export / Import
+  $('export-json-btn').addEventListener('click', Export.toJSON);
+  $('export-csv-btn').addEventListener('click', Export.toCSV);
+  $('import-file-input').addEventListener('change', (e) => {
+    if (e.target.files[0]) Export.fromJSON(e.target.files[0]);
+    e.target.value = '';
   });
 
   // Periodic save
