@@ -232,7 +232,7 @@ const SoundPlayer = {
     }
   },
 
-  playTone(freq, duration, startDelay = 0) {
+  playTone(freq, duration, startDelay = 0, attack = 0, peakGain = 0.5) {
     if (!audioCtx || audioCtx.state !== 'running') return;
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
@@ -241,7 +241,12 @@ const SoundPlayer = {
     osc.frequency.value = freq;
     osc.type = 'sine';
     const t = audioCtx.currentTime + startDelay;
-    gain.gain.setValueAtTime(0.5, t);
+    if (attack > 0) {
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.linearRampToValueAtTime(peakGain, t + attack);
+    } else {
+      gain.gain.setValueAtTime(peakGain, t);
+    }
     gain.gain.exponentialRampToValueAtTime(0.01, t + duration);
     osc.start(t);
     osc.stop(t + duration + 0.01);
@@ -255,7 +260,7 @@ const SoundPlayer = {
 
   playPressClick() {
     if (!settings.pressBeep) return;
-    SoundPlayer.playTone(600, 0.05, 0);
+    SoundPlayer.playTone(230, 0.2, 0, 0.006, 0.18);
   }
 };
 
@@ -1054,8 +1059,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Stats
   $('stats-btn').addEventListener('click', () => {
-    renderStatsChart();
     showScreen('stats');
+    renderStatsChart();
   });
 
   $('stats-back-btn').addEventListener('click', () => {
@@ -1225,7 +1230,7 @@ function renderStatsChart() {
   ctx.strokeStyle = '#1a2744';
   ctx.lineWidth = 1;
   ctx.fillStyle = '#666';
-  ctx.font = '12px "Segoe UI", Arial, sans-serif';
+  ctx.font = '14px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
 
@@ -1246,7 +1251,7 @@ function renderStatsChart() {
 
   // Day labels on X axis
   ctx.fillStyle = '#888';
-  ctx.font = '12px "Segoe UI", Arial, sans-serif';
+  ctx.font = '14px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   days.forEach((day, i) => {
@@ -1309,6 +1314,25 @@ function renderStatsChart() {
     ctx.fill();
   }
 
+  // Mean rate dashed line
+  const meanRate = allRates.reduce((a, b) => a + b, 0) / allRates.length;
+  const meanY = yPos(meanRate);
+  ctx.save();
+  ctx.strokeStyle = '#FFB74D';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(plotLeft, meanY);
+  ctx.lineTo(chartWidth - padRight, meanY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#FFB74D';
+  ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText('avg ' + Math.round(meanRate) + '/hr', chartWidth - padRight - 6, meanY - 3);
+  ctx.restore();
+
   // Draw dots + value labels
   plotPoints.forEach(p => {
     ctx.fillStyle = '#6367FF';
@@ -1323,7 +1347,7 @@ function renderStatsChart() {
 
     // Value label above dot
     ctx.fillStyle = '#ccc';
-    ctx.font = '11px "Segoe UI", Arial, sans-serif';
+    ctx.font = '13px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(p.perHour, p.x, p.y - 8);
