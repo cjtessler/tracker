@@ -375,9 +375,12 @@ const Timer = {
   },
 
   checkMinuteAlert(elapsedMs) {
-    const elapsedMin = Math.floor(elapsedMs / 60000);
-    if (elapsedMin > lastAlertedMinute) {
-      lastAlertedMinute = elapsedMin;
+    const t = (session && session.activeSection && settings.thresholds[session.activeSection])
+      ? settings.thresholds[session.activeSection]
+      : { warning: 45, alert: 60 };
+    const alertPeriod = Math.floor(Math.floor(elapsedMs / 1000) / t.alert);
+    if (alertPeriod > lastAlertedMinute) {
+      lastAlertedMinute = alertPeriod;
       SoundPlayer.playMinuteAlert();
     }
   }
