@@ -1252,7 +1252,7 @@ function renderStatsChart() {
   const chartDateColor  = isLight ? '#7777aa' : '#888';
   const chartDivColor   = isLight ? '#e8eaff' : '#16213e';
   const chartValColor   = isLight ? '#4a4a6a' : '#ccc';
-  const chartAvgColor   = isLight ? '#C46A00' : chartAvgColor;
+  const chartAvgColor   = isLight ? '#C46A00' : '#FFB74D';
 
   // Grid lines and Y labels
   ctx.strokeStyle = chartGridColor;
