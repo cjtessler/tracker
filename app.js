@@ -1086,6 +1086,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btn.addEventListener('click', openSettings);
   });
   $('settings-close-btn').addEventListener('click', closeSettings);
+  $('reload-page-btn').addEventListener('click', () => location.reload());
   $('settings-modal').addEventListener('click', (e) => {
     if (e.target === $('settings-modal')) closeSettings();
   });
