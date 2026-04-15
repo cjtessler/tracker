@@ -40,6 +40,7 @@ const DEFAULT_THRESHOLDS = {
 let settings = {
   pressBeep: true,
   minuteAlert: true,
+  theme: 'dark',
   thresholds: {
     'CB-105': { warning: 45, alert: 60 },
     'PVS':    { warning: 45, alert: 60 },
@@ -109,6 +110,7 @@ function loadSettings() {
     const parsed = JSON.parse(raw);
     if (typeof parsed.pressBeep === 'boolean') settings.pressBeep = parsed.pressBeep;
     if (typeof parsed.minuteAlert === 'boolean') settings.minuteAlert = parsed.minuteAlert;
+    if (parsed.theme === 'light' || parsed.theme === 'dark') settings.theme = parsed.theme;
     if (parsed.thresholds && typeof parsed.thresholds === 'object') {
       SECTIONS.forEach(q => {
         const qt = parsed.thresholds[q];
@@ -817,8 +819,14 @@ function renderHistoryDetail(s) {
   showScreen('history-detail');
 }
 
+// === THEME ===
+function applyTheme() {
+  document.documentElement.setAttribute('data-theme', settings.theme);
+}
+
 // === SETTINGS MODAL ===
 function openSettings() {
+  $('toggle-theme').checked = settings.theme === 'light';
   $('toggle-press-beep').checked = settings.pressBeep;
   $('toggle-minute-alert').checked = settings.minuteAlert;
   SECTIONS.forEach(q => {
@@ -834,6 +842,7 @@ function closeSettings() {
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
+  applyTheme();
 
   // Check for saved session
   const saved = Storage.load();
@@ -1093,6 +1102,12 @@ document.addEventListener('DOMContentLoaded', () => {
   $('settings-modal').addEventListener('click', (e) => {
     if (e.target === $('settings-modal')) closeSettings();
   });
+  $('toggle-theme').addEventListener('change', (e) => {
+    settings.theme = e.target.checked ? 'light' : 'dark';
+    applyTheme();
+    saveSettings();
+    renderStatsChart();
+  });
   $('toggle-press-beep').addEventListener('change', (e) => {
     settings.pressBeep = e.target.checked;
     saveSettings();
@@ -1230,10 +1245,19 @@ function renderStatsChart() {
   const ySteps = 5;
   const yStep = yMax / ySteps;
 
+  // Theme-aware colors
+  const isLight = settings.theme === 'light';
+  const chartGridColor  = isLight ? '#e0e0ff' : '#1a2744';
+  const chartLabelColor = isLight ? '#8888aa' : '#666';
+  const chartDateColor  = isLight ? '#7777aa' : '#888';
+  const chartDivColor   = isLight ? '#e8eaff' : '#16213e';
+  const chartValColor   = isLight ? '#4a4a6a' : '#ccc';
+  const chartAvgColor   = isLight ? '#C46A00' : chartAvgColor;
+
   // Grid lines and Y labels
-  ctx.strokeStyle = '#1a2744';
+  ctx.strokeStyle = chartGridColor;
   ctx.lineWidth = 1;
-  ctx.fillStyle = '#666';
+  ctx.fillStyle = chartLabelColor;
   ctx.font = '14px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
@@ -1254,7 +1278,7 @@ function renderStatsChart() {
   }
 
   // Day labels on X axis
-  ctx.fillStyle = '#888';
+  ctx.fillStyle = chartDateColor;
   ctx.font = '14px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -1265,7 +1289,7 @@ function renderStatsChart() {
     ctx.fillText(label, x, plotBottom + 6);
 
     // Day divider
-    ctx.strokeStyle = '#16213e';
+    ctx.strokeStyle = chartDivColor;
     ctx.beginPath();
     ctx.moveTo(x, plotTop);
     ctx.lineTo(x, plotBottom);
@@ -1322,7 +1346,7 @@ function renderStatsChart() {
   const meanRate = allRates.reduce((a, b) => a + b, 0) / allRates.length;
   const meanY = yPos(meanRate);
   ctx.save();
-  ctx.strokeStyle = '#FFB74D';
+  ctx.strokeStyle = chartAvgColor;
   ctx.lineWidth = 1.5;
   ctx.setLineDash([6, 4]);
   ctx.beginPath();
@@ -1330,7 +1354,7 @@ function renderStatsChart() {
   ctx.lineTo(chartWidth - padRight, meanY);
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = '#FFB74D';
+  ctx.fillStyle = chartAvgColor;
   ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'bottom';
@@ -1350,7 +1374,7 @@ function renderStatsChart() {
     ctx.fill();
 
     // Value label above dot
-    ctx.fillStyle = '#ccc';
+    ctx.fillStyle = chartValColor;
     ctx.font = '13px "Segoe UI", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';

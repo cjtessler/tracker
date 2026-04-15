@@ -177,46 +177,54 @@
         <button id="settings-close-btn" class="hist-btn">&#10005;</button>
       </div>
       <div id="settings-body">
-        <div class="setting-row">
-          <span class="setting-label">Press beep</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="toggle-press-beep">
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          </label>
+        <div id="settings-col-left">
+          <div class="setting-row">
+            <span class="setting-label">Light theme</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-theme">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">Press beep</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-press-beep">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">Minute alert</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="toggle-minute-alert">
+              <span class="toggle-track"><span class="toggle-thumb"></span></span>
+            </label>
+          </div>
+          <div class="setting-row">
+            <span class="setting-label">Reload page</span>
+            <button id="reload-page-btn" class="hist-btn">&#8635; Reload</button>
+          </div>
         </div>
-        <div class="setting-row">
-          <span class="setting-label">Minute alert</span>
-          <label class="toggle-switch">
-            <input type="checkbox" id="toggle-minute-alert">
-            <span class="toggle-track"><span class="toggle-thumb"></span></span>
-          </label>
-        </div>
-        <div class="setting-section-divider"></div>
-        <div class="setting-label-header">Alert Thresholds (seconds)</div>
-        <div class="threshold-grid">
-          <div class="thresh-col-header"></div>
-          <div class="thresh-col-header">Warn</div>
-          <div class="thresh-col-header">Alert</div>
-          <div class="thresh-queue-name">CB-105</div>
-          <div class="thresh-stepper" id="thresh-warn-CB-105"><button class="thresh-btn" data-queue="CB-105" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="CB-105" data-type="warning" data-dir="1">+</button></div>
-          <div class="thresh-stepper" id="thresh-alert-CB-105"><button class="thresh-btn" data-queue="CB-105" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="CB-105" data-type="alert" data-dir="1">+</button></div>
-          <div class="thresh-queue-name">PVS</div>
-          <div class="thresh-stepper" id="thresh-warn-PVS"><button class="thresh-btn" data-queue="PVS" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="PVS" data-type="warning" data-dir="1">+</button></div>
-          <div class="thresh-stepper" id="thresh-alert-PVS"><button class="thresh-btn" data-queue="PVS" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="PVS" data-type="alert" data-dir="1">+</button></div>
-          <div class="thresh-queue-name">PVSI</div>
-          <div class="thresh-stepper" id="thresh-warn-PVSI"><button class="thresh-btn" data-queue="PVSI" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="PVSI" data-type="warning" data-dir="1">+</button></div>
-          <div class="thresh-stepper" id="thresh-alert-PVSI"><button class="thresh-btn" data-queue="PVSI" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="PVSI" data-type="alert" data-dir="1">+</button></div>
-          <div class="thresh-queue-name">SMS</div>
-          <div class="thresh-stepper" id="thresh-warn-SMS"><button class="thresh-btn" data-queue="SMS" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="SMS" data-type="warning" data-dir="1">+</button></div>
-          <div class="thresh-stepper" id="thresh-alert-SMS"><button class="thresh-btn" data-queue="SMS" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="SMS" data-type="alert" data-dir="1">+</button></div>
-          <div class="thresh-queue-name">OP222</div>
-          <div class="thresh-stepper" id="thresh-warn-OP222"><button class="thresh-btn" data-queue="OP222" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="OP222" data-type="warning" data-dir="1">+</button></div>
-          <div class="thresh-stepper" id="thresh-alert-OP222"><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="1">+</button></div>
-        </div>
-        <div class="setting-section-divider"></div>
-        <div class="setting-row">
-          <span class="setting-label">Reload page</span>
-          <button id="reload-page-btn" class="hist-btn">&#8635; Reload</button>
+        <div id="settings-col-right">
+          <div class="threshold-grid">
+            <div class="thresh-col-header"></div>
+            <div class="thresh-col-header">Warn</div>
+            <div class="thresh-col-header">Alert</div>
+            <div class="thresh-queue-name">CB-105</div>
+            <div class="thresh-stepper" id="thresh-warn-CB-105"><button class="thresh-btn" data-queue="CB-105" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="CB-105" data-type="warning" data-dir="1">+</button></div>
+            <div class="thresh-stepper" id="thresh-alert-CB-105"><button class="thresh-btn" data-queue="CB-105" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="CB-105" data-type="alert" data-dir="1">+</button></div>
+            <div class="thresh-queue-name">PVS</div>
+            <div class="thresh-stepper" id="thresh-warn-PVS"><button class="thresh-btn" data-queue="PVS" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="PVS" data-type="warning" data-dir="1">+</button></div>
+            <div class="thresh-stepper" id="thresh-alert-PVS"><button class="thresh-btn" data-queue="PVS" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="PVS" data-type="alert" data-dir="1">+</button></div>
+            <div class="thresh-queue-name">PVSI</div>
+            <div class="thresh-stepper" id="thresh-warn-PVSI"><button class="thresh-btn" data-queue="PVSI" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="PVSI" data-type="warning" data-dir="1">+</button></div>
+            <div class="thresh-stepper" id="thresh-alert-PVSI"><button class="thresh-btn" data-queue="PVSI" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="PVSI" data-type="alert" data-dir="1">+</button></div>
+            <div class="thresh-queue-name">SMS</div>
+            <div class="thresh-stepper" id="thresh-warn-SMS"><button class="thresh-btn" data-queue="SMS" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="SMS" data-type="warning" data-dir="1">+</button></div>
+            <div class="thresh-stepper" id="thresh-alert-SMS"><button class="thresh-btn" data-queue="SMS" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="SMS" data-type="alert" data-dir="1">+</button></div>
+            <div class="thresh-queue-name">OP222</div>
+            <div class="thresh-stepper" id="thresh-warn-OP222"><button class="thresh-btn" data-queue="OP222" data-type="warning" data-dir="-1">&#8722;</button><span class="thresh-val">45</span><button class="thresh-btn" data-queue="OP222" data-type="warning" data-dir="1">+</button></div>
+            <div class="thresh-stepper" id="thresh-alert-OP222"><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="1">+</button></div>
+          </div>
         </div>
       </div>
     </div>
