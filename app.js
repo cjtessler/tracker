@@ -4,6 +4,7 @@ const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
 const STORAGE_KEY = 'pedal-tracker-session';
 const HISTORY_KEY = 'pedal-tracker-history';
+const SETTINGS_KEY = 'pedal-tracker-settings';
 const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 const HOLD_DELAY_MS = 250;
@@ -29,6 +30,24 @@ let bHoldTimer = null;
 let bFillTimer = null;
 let bHoldFired = false;
 let endHoldTimer = null;
+const DEFAULT_THRESHOLDS = {
+  'CB-105': { warning: 45, alert: 60 },
+  'PVS':    { warning: 45, alert: 60 },
+  'PVSI':   { warning: 45, alert: 60 },
+  'SMS':    { warning: 45, alert: 60 },
+  'OP222':  { warning: 45, alert: 60 }
+};
+let settings = {
+  pressBeep: true,
+  minuteAlert: true,
+  thresholds: {
+    'CB-105': { warning: 45, alert: 60 },
+    'PVS':    { warning: 45, alert: 60 },
+    'PVSI':   { warning: 45, alert: 60 },
+    'SMS':    { warning: 45, alert: 60 },
+    'OP222':  { warning: 45, alert: 60 }
+  }
+};
 
 // === DOM REFS ===
 const $ = (id) => document.getElementById(id);
@@ -81,6 +100,33 @@ const Storage = {
     localStorage.removeItem(HISTORY_KEY);
   }
 };
+
+// === SETTINGS ===
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw);
+    if (typeof parsed.pressBeep === 'boolean') settings.pressBeep = parsed.pressBeep;
+    if (typeof parsed.minuteAlert === 'boolean') settings.minuteAlert = parsed.minuteAlert;
+    if (parsed.thresholds && typeof parsed.thresholds === 'object') {
+      SECTIONS.forEach(q => {
+        const qt = parsed.thresholds[q];
+        if (qt && typeof qt === 'object') {
+          const w = parseInt(qt.warning, 10);
+          const a = parseInt(qt.alert, 10);
+          if (!isNaN(w) && w > 0) settings.thresholds[q].warning = w;
+          if (!isNaN(a) && a > 0) settings.thresholds[q].alert = a;
+        }
+      });
+    }
+  } catch (e) {}
+}
+function saveSettings() {
+  try {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  } catch (e) {}
+}
 
 // === EXPORT / IMPORT ===
 const Export = {
@@ -202,11 +248,13 @@ const SoundPlayer = {
   },
 
   playMinuteAlert() {
+    if (!settings.minuteAlert) return;
     SoundPlayer.playTone(880, 0.15, 0);
     SoundPlayer.playTone(880, 0.15, 0.25);
   },
 
   playPressClick() {
+    if (!settings.pressBeep) return;
     SoundPlayer.playTone(600, 0.05, 0);
   }
 };
@@ -311,9 +359,12 @@ const Timer = {
 
     // Color coding
     timerEl.classList.remove('warning', 'alert');
-    if (totalSec >= 60) {
+    const t = (session && session.activeSection && settings.thresholds[session.activeSection])
+      ? settings.thresholds[session.activeSection]
+      : { warning: 45, alert: 60 };
+    if (totalSec >= t.alert) {
       timerEl.classList.add('alert');
-    } else if (totalSec >= 45) {
+    } else if (totalSec >= t.warning) {
       timerEl.classList.add('warning');
     }
   },
@@ -600,7 +651,7 @@ function updateClock() {
   const date = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   const time = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   const full = date + '  \u2022  ' + time;
-  $('start-clock').textContent = full;
+  $('start-clock-text').textContent = full;
   $('session-clock').textContent = date + '  \u2022  ' + time;
 }
 
@@ -758,8 +809,24 @@ function renderHistoryDetail(s) {
   showScreen('history-detail');
 }
 
+// === SETTINGS MODAL ===
+function openSettings() {
+  $('toggle-press-beep').checked = settings.pressBeep;
+  $('toggle-minute-alert').checked = settings.minuteAlert;
+  SECTIONS.forEach(q => {
+    $('thresh-warn-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].warning;
+    $('thresh-alert-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].alert;
+  });
+  $('settings-modal').classList.remove('hidden');
+}
+function closeSettings() {
+  $('settings-modal').classList.add('hidden');
+}
+
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+
   // Check for saved session
   const saved = Storage.load();
   if (saved && saved.active) {
@@ -1008,6 +1075,41 @@ document.addEventListener('DOMContentLoaded', () => {
   setInterval(() => {
     if (session && session.active) Storage.save(session);
   }, SAVE_INTERVAL_MS);
+
+  // Settings modal
+  document.querySelectorAll('.settings-gear-btn').forEach(btn => {
+    btn.addEventListener('click', openSettings);
+  });
+  $('settings-close-btn').addEventListener('click', closeSettings);
+  $('settings-modal').addEventListener('click', (e) => {
+    if (e.target === $('settings-modal')) closeSettings();
+  });
+  $('toggle-press-beep').addEventListener('change', (e) => {
+    settings.pressBeep = e.target.checked;
+    saveSettings();
+  });
+  $('toggle-minute-alert').addEventListener('change', (e) => {
+    settings.minuteAlert = e.target.checked;
+    saveSettings();
+  });
+  document.querySelectorAll('.thresh-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const q = btn.dataset.queue;
+      const type = btn.dataset.type;
+      const dir = parseInt(btn.dataset.dir, 10);
+      const t = settings.thresholds[q];
+      if (type === 'warning') {
+        const v = t.warning + dir * 5;
+        if (v >= 5 && v < t.alert) t.warning = v;
+      } else {
+        const v = t.alert + dir * 5;
+        if (v > t.warning && v <= 300) t.alert = v;
+      }
+      saveSettings();
+      $('thresh-warn-' + q).querySelector('.thresh-val').textContent = t.warning;
+      $('thresh-alert-' + q).querySelector('.thresh-val').textContent = t.alert;
+    });
+  });
 });
 
 function getLastActivityTime(s) {

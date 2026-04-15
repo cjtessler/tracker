@@ -67,8 +67,9 @@ html, body {
 .clock-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   height: 70px;
+  padding: 0 16px;
   background: #0f3460;
   border-bottom: 4px solid #6367FF;
   font-size: 22px;
@@ -188,10 +189,11 @@ html, body {
   align-items: center;
   justify-content: space-between;
   height: 70px;
-  padding: 0 24px;
+  padding: 0 16px;
   background: #0f3460;
   border-bottom: 4px solid #6367FF;
   flex-shrink: 0;
+  position: relative;
 }
 
 .session-clock {
@@ -201,9 +203,13 @@ html, body {
 }
 
 #session-section-name {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   font-size: 22px;
   font-weight: 700;
   color: #fff;
+  pointer-events: none;
 }
 
 /* === RESUME SECTION LABEL === */
@@ -764,4 +770,201 @@ html, body {
   justify-content: center;
   color: #666;
   font-size: 16px;
+}
+
+/* === SETTINGS GEAR BUTTON === */
+.settings-gear-btn {
+  background: transparent;
+  border: none;
+  color: #6367FF;
+  font-size: 22px;
+  width: 44px;
+  height: 44px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: unset;
+  flex-shrink: 0;
+}
+
+.settings-gear-btn:active {
+  background: #16213e;
+  transform: scale(0.96);
+}
+
+/* === SETTINGS MODAL === */
+#settings-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#settings-modal.hidden {
+  display: none;
+}
+
+#settings-panel {
+  background: #16213e;
+  border: 2px solid #6367FF;
+  border-radius: 12px;
+  width: 320px;
+  overflow-y: auto;
+  max-height: 460px;
+}
+
+#settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: #0f3460;
+  border-bottom: 2px solid #6367FF;
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+}
+
+#settings-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+/* Toggle switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-track {
+  display: flex;
+  align-items: center;
+  width: 52px;
+  height: 28px;
+  background: #333;
+  border-radius: 14px;
+  transition: background 0.2s;
+  cursor: pointer;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: #6367FF;
+}
+
+.toggle-thumb {
+  width: 22px;
+  height: 22px;
+  background: #fff;
+  border-radius: 50%;
+  margin-left: 3px;
+  transition: margin-left 0.2s;
+  flex-shrink: 0;
+}
+
+.toggle-switch input:checked + .toggle-track .toggle-thumb {
+  margin-left: 27px;
+}
+
+/* === THRESHOLD GRID === */
+.setting-section-divider {
+  height: 1px;
+  background: #1a2744;
+  margin: 0 -16px;
+}
+
+.setting-label-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: #6367FF;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.threshold-grid {
+  display: grid;
+  grid-template-columns: 1fr 96px 96px;
+  gap: 6px 6px;
+  align-items: center;
+}
+
+.thresh-col-header {
+  font-size: 12px;
+  font-weight: 700;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+}
+
+.thresh-col-header:first-child {
+  text-align: left;
+}
+
+.thresh-queue-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ccc;
+}
+
+.thresh-stepper {
+  display: flex;
+  align-items: center;
+  background: #0f1428;
+  border: 1px solid #2a3060;
+  border-radius: 6px;
+  height: 40px;
+  overflow: hidden;
+}
+
+.thresh-btn {
+  width: 30px;
+  height: 40px;
+  background: transparent;
+  border: none;
+  color: #6367FF;
+  font-size: 20px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: unset;
+  padding: 0;
+  touch-action: manipulation;
+}
+
+.thresh-btn:active {
+  background: #1a2744;
+}
+
+.thresh-val {
+  flex: 1;
+  text-align: center;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
 }
