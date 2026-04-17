@@ -37,6 +37,11 @@ const DEFAULT_THRESHOLDS = {
   'SMS':    { warning: 45, alert: 60 },
   'OP222':  { warning: 45, alert: 60 }
 };
+const DEFAULT_GOAL_RATES = {
+  'CB-105': 0, 'PVS': 0, 'PVSI': 0, 'SMS': 0, 'OP222': 0
+};
+const GOAL_STEP = 5;
+const GOAL_MAX = 1000;
 let settings = {
   pressBeep: true,
   minuteAlert: true,
@@ -47,7 +52,8 @@ let settings = {
     'PVSI':   { warning: 45, alert: 60 },
     'SMS':    { warning: 45, alert: 60 },
     'OP222':  { warning: 45, alert: 60 }
-  }
+  },
+  goalRates: { ...DEFAULT_GOAL_RATES }
 };
 
 // === DOM REFS ===
@@ -120,6 +126,12 @@ function loadSettings() {
           if (!isNaN(w) && w > 0) settings.thresholds[q].warning = w;
           if (!isNaN(a) && a > 0) settings.thresholds[q].alert = a;
         }
+      });
+    }
+    if (parsed.goalRates && typeof parsed.goalRates === 'object') {
+      SECTIONS.forEach(q => {
+        const g = parseInt(parsed.goalRates[q], 10);
+        if (!isNaN(g) && g >= 0) settings.goalRates[q] = Math.min(g, GOAL_MAX);
       });
     }
   } catch (e) {}
@@ -402,25 +414,22 @@ const UI = {
   },
 
   renderStats() {
-    const metrics = computeMetrics(session.activeSection);
     const sessionStart = new Date(session.startTime).getTime();
     const sessionDurMin = (Date.now() - sessionStart) / 60000;
     const count = session.sections[session.activeSection].count;
 
     const perMin = sessionDurMin > 0.01 ? count / sessionDurMin : 0;
-    $('stat-rate').textContent = perMin > 0
-      ? perMin.toFixed(1) + '/min'
-      : '--/min';
+    const perHour = Math.round(perMin * 60);
+    const rateEl = $('stat-rate-hr');
+    rateEl.textContent = perMin > 0 ? perHour + '/hr' : '--/hr';
 
-    $('stat-rate-hr').textContent = perMin > 0
-      ? Math.round(perMin * 60) + '/hr'
-      : '--/hr';
+    const goal = settings.goalRates[session.activeSection] || 0;
+    $('stat-goal-value').textContent = goal > 0 ? goal + '/hr' : '--/hr';
 
-    $('stat-avg').textContent = metrics.intervals.length > 0
-      ? formatDuration(metrics.avgInterval)
-      : '--';
-
-    $('stat-total').textContent = count;
+    rateEl.classList.remove('stat-below', 'stat-above');
+    if (goal > 0 && count > 0) {
+      rateEl.classList.add(perHour < goal ? 'stat-below' : 'stat-above');
+    }
   },
 
   renderUndoState() {
@@ -839,6 +848,29 @@ function closeSettings() {
   $('settings-modal').classList.add('hidden');
 }
 
+// === GOAL MODAL ===
+function openGoalModal() {
+  if (!session) return;
+  const section = session.activeSection;
+  $('goal-modal-section').textContent = section;
+  $('goal-stepper-val').textContent = settings.goalRates[section] || 0;
+  $('goal-modal').classList.remove('hidden');
+}
+function closeGoalModal() {
+  $('goal-modal').classList.add('hidden');
+}
+function adjustGoal(dir) {
+  if (!session) return;
+  const section = session.activeSection;
+  const current = settings.goalRates[section] || 0;
+  const next = Math.max(0, Math.min(GOAL_MAX, current + dir * GOAL_STEP));
+  if (next === current) return;
+  settings.goalRates[section] = next;
+  saveSettings();
+  $('goal-stepper-val').textContent = next;
+  UI.renderStats();
+}
+
 // === INITIALIZATION ===
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
@@ -1134,6 +1166,16 @@ document.addEventListener('DOMContentLoaded', () => {
       $('thresh-alert-' + q).querySelector('.thresh-val').textContent = t.alert;
     });
   });
+
+  // Goal modal
+  $('stat-goal').addEventListener('click', openGoalModal);
+  $('goal-close-btn').addEventListener('click', closeGoalModal);
+  $('goal-done').addEventListener('click', closeGoalModal);
+  $('goal-modal').addEventListener('click', (e) => {
+    if (e.target === $('goal-modal')) closeGoalModal();
+  });
+  $('goal-inc').addEventListener('click', () => adjustGoal(1));
+  $('goal-dec').addEventListener('click', () => adjustGoal(-1));
 });
 
 function getLastActivityTime(s) {
