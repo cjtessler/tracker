@@ -64,20 +64,12 @@
     <!-- Stats bar -->
     <div id="stats-bar">
       <div class="stat">
-        <span class="stat-label">Per Min</span>
-        <span class="stat-value" id="stat-rate">--/min</span>
-      </div>
-      <div class="stat">
         <span class="stat-label">Per Hour</span>
         <span class="stat-value" id="stat-rate-hr">--/hr</span>
       </div>
-      <div class="stat">
-        <span class="stat-label">Avg</span>
-        <span class="stat-value" id="stat-avg">--</span>
-      </div>
-      <div class="stat">
-        <span class="stat-label">Total</span>
-        <span class="stat-value" id="stat-total">0</span>
+      <div class="stat stat-goal" id="stat-goal">
+        <span class="stat-label">Goal</span>
+        <span class="stat-value" id="stat-goal-value">--/hr</span>
       </div>
     </div>
 
@@ -226,6 +218,25 @@
             <div class="thresh-stepper" id="thresh-alert-OP222"><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="-1">&#8722;</button><span class="thresh-val">60</span><button class="thresh-btn" data-queue="OP222" data-type="alert" data-dir="1">+</button></div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== GOAL MODAL ==================== -->
+  <div id="goal-modal" class="hidden">
+    <div id="goal-panel">
+      <div id="goal-modal-header">
+        <span>Goal for <span id="goal-modal-section">CB-105</span></span>
+        <button id="goal-close-btn" class="hist-btn">&#10005;</button>
+      </div>
+      <div id="goal-modal-body">
+        <div class="goal-stepper">
+          <button class="goal-btn" id="goal-dec">&#8722;</button>
+          <span class="goal-val" id="goal-stepper-val">0</span>
+          <span class="goal-unit">/hr</span>
+          <button class="goal-btn" id="goal-inc">+</button>
+        </div>
+        <button id="goal-done" class="btn goal-done-btn">Done</button>
       </div>
     </div>
   </div>
