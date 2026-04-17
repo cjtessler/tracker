@@ -841,6 +841,7 @@ function openSettings() {
   SECTIONS.forEach(q => {
     $('thresh-warn-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].warning;
     $('thresh-alert-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].alert;
+    $('thresh-goal-' + q).querySelector('.thresh-val').textContent = settings.goalRates[q] || 0;
   });
   $('settings-modal').classList.remove('hidden');
 }
@@ -1153,6 +1154,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const q = btn.dataset.queue;
       const type = btn.dataset.type;
       const dir = parseInt(btn.dataset.dir, 10);
+      if (type === 'goal') {
+        const current = settings.goalRates[q] || 0;
+        const next = Math.max(0, Math.min(GOAL_MAX, current + dir * GOAL_STEP));
+        if (next === current) return;
+        settings.goalRates[q] = next;
+        saveSettings();
+        $('thresh-goal-' + q).querySelector('.thresh-val').textContent = next;
+        if (session && session.active && session.activeSection === q) {
+          UI.renderStats();
+        }
+        return;
+      }
       const t = settings.thresholds[q];
       if (type === 'warning') {
         const v = t.warning + dir * 5;
@@ -1384,24 +1397,30 @@ function renderStatsChart() {
     ctx.fill();
   }
 
-  // Mean rate dashed line
-  const meanRate = allRates.reduce((a, b) => a + b, 0) / allRates.length;
-  const meanY = yPos(meanRate);
-  ctx.save();
-  ctx.strokeStyle = chartAvgColor;
-  ctx.lineWidth = 1.5;
-  ctx.setLineDash([6, 4]);
-  ctx.beginPath();
-  ctx.moveTo(plotLeft, meanY);
-  ctx.lineTo(chartWidth - padRight, meanY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.fillStyle = chartAvgColor;
-  ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('avg ' + Math.round(meanRate) + '/hr', chartWidth - padRight - 6, meanY - 3);
-  ctx.restore();
+  // Mean rate dashed line — resets monthly, so only includes current-month sessions
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const monthRates = points.filter(p => p.time >= monthStart).map(p => p.perHour);
+  if (monthRates.length > 0) {
+    const meanRate = monthRates.reduce((a, b) => a + b, 0) / monthRates.length;
+    const meanY = yPos(meanRate);
+    ctx.save();
+    ctx.strokeStyle = chartAvgColor;
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.moveTo(plotLeft, meanY);
+    ctx.lineTo(chartWidth - padRight, meanY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = chartAvgColor;
+    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'bottom';
+    const monthLabel = now.toLocaleDateString('en-US', { month: 'short' });
+    ctx.fillText(monthLabel + ' avg ' + Math.round(meanRate) + '/hr', chartWidth - padRight - 6, meanY - 3);
+    ctx.restore();
+  }
 
   // Draw dots + value labels
   plotPoints.forEach(p => {

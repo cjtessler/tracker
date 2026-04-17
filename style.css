@@ -83,7 +83,6 @@ html, body {
   color: var(--c-body-text);
   -webkit-user-select: none;
   user-select: none;
-  cursor: none;
 }
 
 /* === SCREENS === */
@@ -1016,13 +1015,27 @@ html, body {
 }
 
 .threshold-grid {
-  display: grid;
-  grid-template-columns: 1fr 96px 96px;
-  gap: 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.thresh-row {
+  display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.thresh-row-label {
+  flex: 0 0 72px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--c-text-a);
 }
 
 .thresh-col-header {
+  flex: 1 1 0;
+  min-width: 0;
   font-size: 12px;
   font-weight: 700;
   color: var(--c-text-d);
@@ -1031,17 +1044,9 @@ html, body {
   text-align: center;
 }
 
-.thresh-col-header:first-child {
-  text-align: left;
-}
-
-.thresh-queue-name {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--c-text-a);
-}
-
 .thresh-stepper {
+  flex: 1 1 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   background: var(--c-nav-deep);
