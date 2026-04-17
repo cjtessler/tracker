@@ -177,19 +177,38 @@
               <span class="toggle-track"><span class="toggle-thumb"></span></span>
             </label>
           </div>
-          <div class="setting-row">
-            <span class="setting-label">Press beep</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="toggle-press-beep">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
+          <div class="setting-row vol-row">
+            <span class="setting-label">Press</span>
+            <div class="vol-controls">
+              <button class="vol-preview-btn" data-vol="press" aria-label="Preview press sound">&#9654;</button>
+              <div class="vol-stepper">
+                <button class="vol-btn" data-vol="press" data-dir="-1">&#8722;</button>
+                <span class="vol-val" id="vol-val-press">100%</span>
+                <button class="vol-btn" data-vol="press" data-dir="1">+</button>
+              </div>
+            </div>
           </div>
-          <div class="setting-row">
+          <div class="setting-row vol-row">
             <span class="setting-label">Minute alert</span>
-            <label class="toggle-switch">
-              <input type="checkbox" id="toggle-minute-alert">
-              <span class="toggle-track"><span class="toggle-thumb"></span></span>
-            </label>
+            <div class="vol-controls">
+              <button class="vol-preview-btn" data-vol="minuteAlert" aria-label="Preview minute alert sound">&#9654;</button>
+              <div class="vol-stepper">
+                <button class="vol-btn" data-vol="minuteAlert" data-dir="-1">&#8722;</button>
+                <span class="vol-val" id="vol-val-minuteAlert">100%</span>
+                <button class="vol-btn" data-vol="minuteAlert" data-dir="1">+</button>
+              </div>
+            </div>
+          </div>
+          <div class="setting-row vol-row">
+            <span class="setting-label">Nudge</span>
+            <div class="vol-controls">
+              <button class="vol-preview-btn" data-vol="nudge" aria-label="Preview nudge sound">&#9654;</button>
+              <div class="vol-stepper">
+                <button class="vol-btn" data-vol="nudge" data-dir="-1">&#8722;</button>
+                <span class="vol-val" id="vol-val-nudge">100%</span>
+                <button class="vol-btn" data-vol="nudge" data-dir="1">+</button>
+              </div>
+            </div>
           </div>
           <div class="setting-row">
             <span class="setting-label">Reload page</span>

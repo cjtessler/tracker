@@ -2,12 +2,16 @@
 
 ## Backlog
 
+- [ ] **Session notes & tags** — Optional free-text note and up to 3 tags per session, editable on the summary screen and visible in history detail. Tags filter the history list and can be overlaid on the stats chart (e.g., tag color dots per point).
+- [ ] **Daily & weekly summaries** — New stats tab showing per-day totals (presses, sessions, avg rate) and a 7-day rolling view. Highlight best/worst days and surface streaks (consecutive days with at least one session).
+- [ ] **Cross-section overlay on stats chart** — Option on the stats screen to overlay all sections on one chart (color-coded lines) instead of one section at a time. Helps spot sections where pace consistently lags the others.
 - [ ] **Widgets** — Add configurable widgets to the session screen (e.g., per-section mini charts, interval trend indicator).
 
 ---
 
 ## Completed
 
+- [x] **Audio volume controls** — Tones routed through a master gain node and normalized so press, minute alert, and nudge sound comparable at default. Replaced mute toggles with 0–100% volume steppers (10% increments) per sound type, each with a speaker preview button. Legacy `pressBeep`/`minuteAlert` booleans migrate to volume values on load.
 - [x] **Goal-setting per section** — Tap the goal stat during a session to set a target rate (presses/hr) via a stepper modal. Per Hour turns red below goal and green at/above. Goals persist per section in settings. *(194d010)*
 - [x] **Dark/light theme toggle** — CSS custom properties for full theming (dark default, light variant). Theme toggle in settings panel, persisted to localStorage. *(692f862)*
 - [x] **Configurable alert thresholds** — Per-section warning/alert threshold steppers (5s increments) in settings modal. Timer color coding reads configured thresholds instead of hardcoded 45/60s. *(0656af6)*

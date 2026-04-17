@@ -999,6 +999,82 @@ html, body {
   margin-left: 27px;
 }
 
+/* === VOLUME STEPPER === */
+.vol-row .setting-label {
+  font-size: 16px;
+}
+
+.vol-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vol-preview-btn {
+  width: 30px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid #6367FF;
+  border-radius: 6px;
+  color: #6367FF;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  min-height: unset;
+  flex-shrink: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.vol-preview-btn:active {
+  background: rgba(99, 103, 255, 0.2);
+  transform: scale(0.96);
+}
+
+.vol-stepper {
+  display: flex;
+  align-items: center;
+  background: var(--c-nav-deep);
+  border: 1px solid var(--c-thresh-border);
+  border-radius: 6px;
+  height: 32px;
+  overflow: hidden;
+}
+
+.vol-btn {
+  width: 26px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  color: #6367FF;
+  font-size: 18px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-height: unset;
+  padding: 0;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.vol-btn:active {
+  background: var(--c-surface-alt);
+}
+
+.vol-val {
+  width: 46px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--c-thresh-val);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 /* === THRESHOLD GRID === */
 .setting-section-divider {
   height: 1px;

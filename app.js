@@ -23,6 +23,7 @@ let clearConfirmTimer = null;
 let deleteConfirmPending = false;
 let deleteConfirmTimer = null;
 let audioCtx = null;
+let masterGain = null;
 let statusTimeout = null;
 let selectedSection = null;
 let viewingHistorySession = null;
@@ -30,6 +31,7 @@ let bHoldTimer = null;
 let bFillTimer = null;
 let bHoldFired = false;
 let endHoldTimer = null;
+let endFillTimer = null;
 const DEFAULT_THRESHOLDS = {
   'CB-105': { warning: 45, alert: 60 },
   'PVS':    { warning: 45, alert: 60 },
@@ -42,9 +44,18 @@ const DEFAULT_GOAL_RATES = {
 };
 const GOAL_STEP = 5;
 const GOAL_MAX = 1000;
+const VOLUME_STEP = 10;
+const VOLUME_KEYS = ['press', 'minuteAlert', 'nudge'];
+// Per-tone peak gain at 100% volume. Calibrated for comparable perceived loudness:
+// press (230Hz) and nudge (180-220Hz) run louder to compensate for low-frequency
+// ear sensitivity; the minute alert (880Hz) sits near peak sensitivity and needs less.
+const TONE_PEAK = {
+  press: 0.28,
+  minuteAlert: 0.22,
+  nudge: 0.30
+};
 let settings = {
-  pressBeep: true,
-  minuteAlert: true,
+  volumes: { press: 100, minuteAlert: 100, nudge: 100 },
   theme: 'dark',
   thresholds: {
     'CB-105': { warning: 45, alert: 60 },
@@ -114,8 +125,21 @@ function loadSettings() {
     const raw = localStorage.getItem(SETTINGS_KEY);
     if (!raw) return;
     const parsed = JSON.parse(raw);
-    if (typeof parsed.pressBeep === 'boolean') settings.pressBeep = parsed.pressBeep;
-    if (typeof parsed.minuteAlert === 'boolean') settings.minuteAlert = parsed.minuteAlert;
+    // Legacy boolean → volume migration
+    if (typeof parsed.pressBeep === 'boolean') {
+      settings.volumes.press = parsed.pressBeep ? 100 : 0;
+    }
+    if (typeof parsed.minuteAlert === 'boolean') {
+      settings.volumes.minuteAlert = parsed.minuteAlert ? 100 : 0;
+    }
+    if (parsed.volumes && typeof parsed.volumes === 'object') {
+      VOLUME_KEYS.forEach(k => {
+        const v = parseInt(parsed.volumes[k], 10);
+        if (!isNaN(v) && v >= 0) {
+          settings.volumes[k] = Math.max(0, Math.min(100, Math.round(v / VOLUME_STEP) * VOLUME_STEP));
+        }
+      });
+    }
     if (parsed.theme === 'light' || parsed.theme === 'dark') settings.theme = parsed.theme;
     if (parsed.thresholds && typeof parsed.thresholds === 'object') {
       SECTIONS.forEach(q => {
@@ -240,6 +264,9 @@ const SoundPlayer = {
   init() {
     if (!audioCtx) {
       audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = 1.0;
+      masterGain.connect(audioCtx.destination);
     }
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
@@ -251,7 +278,7 @@ const SoundPlayer = {
     const osc = audioCtx.createOscillator();
     const gain = audioCtx.createGain();
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(masterGain || audioCtx.destination);
     osc.frequency.value = freq;
     osc.type = 'sine';
     const t = audioCtx.currentTime + startDelay;
@@ -266,15 +293,29 @@ const SoundPlayer = {
     osc.stop(t + duration + 0.01);
   },
 
-  playMinuteAlert() {
-    if (!settings.minuteAlert) return;
-    SoundPlayer.playTone(880, 0.15, 0);
-    SoundPlayer.playTone(880, 0.15, 0.25);
+  _scaled(key) {
+    const vol = (settings.volumes[key] || 0) / 100;
+    return TONE_PEAK[key] * vol;
   },
 
   playPressClick() {
-    if (!settings.pressBeep) return;
-    SoundPlayer.playTone(230, 0.2, 0, 0.006, 0.18);
+    const g = SoundPlayer._scaled('press');
+    if (g <= 0) return;
+    SoundPlayer.playTone(230, 0.2, 0, 0.006, g);
+  },
+
+  playMinuteAlert() {
+    const g = SoundPlayer._scaled('minuteAlert');
+    if (g <= 0) return;
+    SoundPlayer.playTone(880, 0.15, 0, 0, g);
+    SoundPlayer.playTone(880, 0.15, 0.25, 0, g);
+  },
+
+  playNudge() {
+    const g = SoundPlayer._scaled('nudge');
+    if (g <= 0) return;
+    SoundPlayer.playTone(220, 0.15, 0, 0, g);
+    SoundPlayer.playTone(180, 0.15, 0.18, 0, g);
   }
 };
 
@@ -489,6 +530,11 @@ const Input = {
     if (!session || !session.active) {
       if ($('save-discard-screen').style.display !== 'none') {
         $('save-btn').click();
+        return;
+      }
+      // B on summary screen → new session
+      if ($('summary-screen').style.display !== 'none') {
+        $('new-session-btn').click();
         return;
       }
       // B on start screen → tap cycles section, hold starts session
@@ -706,8 +752,7 @@ function formatDuration(ms) {
 // === NUDGE ===
 function nudgeSectionSelector() {
   SoundPlayer.init();
-  SoundPlayer.playTone(220, 0.15, 0);
-  SoundPlayer.playTone(180, 0.15, 0.18);
+  SoundPlayer.playNudge();
   const el = $('section-selector');
   el.classList.remove('shake');
   void el.offsetWidth;
@@ -836,8 +881,9 @@ function applyTheme() {
 // === SETTINGS MODAL ===
 function openSettings() {
   $('toggle-theme').checked = settings.theme === 'light';
-  $('toggle-press-beep').checked = settings.pressBeep;
-  $('toggle-minute-alert').checked = settings.minuteAlert;
+  VOLUME_KEYS.forEach(k => {
+    $('vol-val-' + k).textContent = settings.volumes[k] + '%';
+  });
   SECTIONS.forEach(q => {
     $('thresh-warn-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].warning;
     $('thresh-alert-' + q).querySelector('.thresh-val').textContent = settings.thresholds[q].alert;
@@ -959,8 +1005,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!session || !session.active) return;
     const btn = $('end-btn');
     btn.classList.remove('filling');
-    void btn.offsetWidth;
-    btn.classList.add('filling');
+    endFillTimer = setTimeout(() => {
+      endFillTimer = null;
+      void btn.offsetWidth;
+      btn.classList.add('filling');
+    }, HOLD_DELAY_MS);
     endHoldTimer = setTimeout(() => {
       endHoldTimer = null;
       btn.classList.remove('filling');
@@ -993,6 +1042,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function cancelEndHold() {
+    if (endFillTimer) {
+      clearTimeout(endFillTimer);
+      endFillTimer = null;
+    }
     if (endHoldTimer) {
       clearTimeout(endHoldTimer);
       endHoldTimer = null;
@@ -1141,13 +1194,26 @@ document.addEventListener('DOMContentLoaded', () => {
     saveSettings();
     renderStatsChart();
   });
-  $('toggle-press-beep').addEventListener('change', (e) => {
-    settings.pressBeep = e.target.checked;
-    saveSettings();
+  document.querySelectorAll('.vol-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.vol;
+      const dir = parseInt(btn.dataset.dir, 10);
+      const current = settings.volumes[key] || 0;
+      const next = Math.max(0, Math.min(100, current + dir * VOLUME_STEP));
+      if (next === current) return;
+      settings.volumes[key] = next;
+      saveSettings();
+      $('vol-val-' + key).textContent = next + '%';
+    });
   });
-  $('toggle-minute-alert').addEventListener('change', (e) => {
-    settings.minuteAlert = e.target.checked;
-    saveSettings();
+  document.querySelectorAll('.vol-preview-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      SoundPlayer.init();
+      const key = btn.dataset.vol;
+      if (key === 'press') SoundPlayer.playPressClick();
+      else if (key === 'minuteAlert') SoundPlayer.playMinuteAlert();
+      else if (key === 'nudge') SoundPlayer.playNudge();
+    });
   });
   document.querySelectorAll('.thresh-btn').forEach(btn => {
     btn.addEventListener('click', () => {
