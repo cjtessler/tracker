@@ -1163,6 +1163,14 @@ html, body {
   pointer-events: none;
 }
 
+.settings-version {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  margin-left: 6px;
+  letter-spacing: 0.3px;
+}
+
 /* === BACKUP (Settings + Summary) === */
 .backup-row .setting-label {
   font-size: 16px;

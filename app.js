@@ -1,4 +1,5 @@
 // === CONSTANTS ===
+const APP_VERSION = '1.0.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
@@ -1087,6 +1088,7 @@ function renderBackupStatus() {
 // === SETTINGS MODAL ===
 function openSettings() {
   renderBackupStatus();
+  $('settings-version').textContent = 'v' + APP_VERSION;
   $('toggle-theme').checked = settings.theme === 'light';
   VOLUME_KEYS.forEach(k => {
     $('vol-val-' + k).textContent = settings.volumes[k] + '%';
