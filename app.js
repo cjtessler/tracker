@@ -1,4 +1,5 @@
 // === CONSTANTS ===
+const APP_VERSION = '1.0.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
@@ -256,6 +257,180 @@ const Export = {
     banner.style.display = 'block';
     clearTimeout(Export._bannerTimer);
     Export._bannerTimer = setTimeout(() => { banner.style.display = 'none'; }, 3000);
+  }
+};
+
+// === BACKUP (File System Access API) ===
+// Persists a FileSystemDirectoryHandle in IndexedDB so a single user pick survives
+// reloads. Used for headless auto-write and one-tap restore on the FullPageOS kiosk
+// where there is no mouse/OS dialog access.
+const BACKUP_FILENAME = 'pedal-tracker-backup.json';
+const BACKUP_DB_NAME = 'pedal-tracker-backup';
+const BACKUP_STORE = 'handles';
+const BACKUP_KEY = 'folder';
+
+const Backup = {
+  _handle: null,
+  _writing: false,
+  _pendingWrite: false,
+
+  isSupported() {
+    return typeof window !== 'undefined' && 'showDirectoryPicker' in window;
+  },
+
+  _openDb() {
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open(BACKUP_DB_NAME, 1);
+      req.onupgradeneeded = () => req.result.createObjectStore(BACKUP_STORE);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async _idbGet() {
+    const db = await Backup._openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BACKUP_STORE, 'readonly');
+      const req = tx.objectStore(BACKUP_STORE).get(BACKUP_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  },
+
+  async _idbPut(value) {
+    const db = await Backup._openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BACKUP_STORE, 'readwrite');
+      tx.objectStore(BACKUP_STORE).put(value, BACKUP_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async _idbDelete() {
+    const db = await Backup._openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(BACKUP_STORE, 'readwrite');
+      tx.objectStore(BACKUP_STORE).delete(BACKUP_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async loadHandle() {
+    if (!Backup.isSupported()) return null;
+    if (Backup._handle) return Backup._handle;
+    try {
+      Backup._handle = await Backup._idbGet();
+      return Backup._handle;
+    } catch {
+      return null;
+    }
+  },
+
+  async chooseFolder() {
+    if (!Backup.isSupported()) throw new Error('not-supported');
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+    await Backup._idbPut(handle);
+    Backup._handle = handle;
+    return handle;
+  },
+
+  async clearFolder() {
+    Backup._handle = null;
+    try { await Backup._idbDelete(); } catch {}
+  },
+
+  // Returns 'granted' | 'denied' | 'prompt' | 'no-handle' | 'error'.
+  // Pass interactive=true to prompt the user (requires a user gesture).
+  async checkPermission(interactive = false) {
+    const handle = await Backup.loadHandle();
+    if (!handle) return 'no-handle';
+    try {
+      let perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') return 'granted';
+      if (interactive) {
+        perm = await handle.requestPermission({ mode: 'readwrite' });
+      }
+      return perm;
+    } catch {
+      return 'error';
+    }
+  },
+
+  async write(history) {
+    const handle = await Backup.loadHandle();
+    if (!handle) return { ok: false, reason: 'no-folder' };
+    if (Backup._writing) {
+      // Coalesce: ensure another write runs after the current one finishes.
+      Backup._pendingWrite = true;
+      return { ok: true, queued: true };
+    }
+    Backup._writing = true;
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') return { ok: false, reason: 'no-permission' };
+      const fileHandle = await handle.getFileHandle(BACKUP_FILENAME, { create: true });
+      const writable = await fileHandle.createWritable();
+      const payload = { exportedAt: new Date().toISOString(), version: 1, sessions: history };
+      await writable.write(JSON.stringify(payload, null, 2));
+      await writable.close();
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, reason: 'write-failed', error: e };
+    } finally {
+      Backup._writing = false;
+      if (Backup._pendingWrite) {
+        Backup._pendingWrite = false;
+        Backup.write(Storage.loadHistory());
+      }
+    }
+  },
+
+  async read() {
+    const handle = await Backup.loadHandle();
+    if (!handle) return { ok: false, reason: 'no-folder' };
+    try {
+      const perm = await handle.queryPermission({ mode: 'readwrite' });
+      if (perm !== 'granted') return { ok: false, reason: 'no-permission' };
+      const fileHandle = await handle.getFileHandle(BACKUP_FILENAME);
+      const file = await fileHandle.getFile();
+      const text = await file.text();
+      const data = JSON.parse(text);
+      return { ok: true, data };
+    } catch (e) {
+      return { ok: false, reason: e && e.name === 'NotFoundError' ? 'no-file' : 'read-failed', error: e };
+    }
+  },
+
+  // Reads backup file and merges new sessions into history. Returns { ok, added, reason }.
+  async restoreToHistory() {
+    const result = await Backup.read();
+    if (!result.ok) return result;
+    const data = result.data;
+    const incoming = Array.isArray(data) ? data : (data && data.sessions);
+    if (!Array.isArray(incoming)) return { ok: false, reason: 'invalid' };
+    const valid = incoming.filter(s => s && s.id && s.startTime && s.sections);
+    const existing = Storage.loadHistory();
+    const existingIds = new Set(existing.map(s => s.id));
+    const added = valid.filter(s => !existingIds.has(s.id));
+    if (added.length === 0) return { ok: true, added: 0 };
+    const merged = [...added, ...existing].sort((a, b) => b.id - a.id);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(merged));
+    } catch {
+      return { ok: false, reason: 'storage-full' };
+    }
+    return { ok: true, added: added.length };
+  },
+
+  async getStatus() {
+    if (!Backup.isSupported()) return { state: 'unsupported' };
+    const handle = await Backup.loadHandle();
+    if (!handle) return { state: 'unconfigured' };
+    let perm = 'prompt';
+    try { perm = await handle.queryPermission({ mode: 'readwrite' }); } catch {}
+    return { state: 'configured', name: handle.name, permission: perm };
   }
 };
 
@@ -878,8 +1053,42 @@ function applyTheme() {
   document.documentElement.setAttribute('data-theme', settings.theme);
 }
 
+// === BACKUP STATUS RENDER ===
+// Refreshes the Settings backup row and toggles the history-screen Restore button.
+function renderBackupStatus() {
+  const statusEl = $('backup-status');
+  const chooseBtn = $('backup-choose-btn');
+  const clearBtn = $('backup-clear-btn');
+  const restoreBtn = $('restore-btn');
+  if (!Backup.isSupported()) {
+    if (statusEl) statusEl.textContent = 'Not supported in this browser';
+    if (chooseBtn) chooseBtn.disabled = true;
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (restoreBtn) restoreBtn.style.display = 'none';
+    return;
+  }
+  Backup.getStatus().then(status => {
+    if (status.state === 'unconfigured') {
+      if (statusEl) statusEl.textContent = 'Not set';
+      if (chooseBtn) { chooseBtn.textContent = 'Choose'; chooseBtn.disabled = false; }
+      if (clearBtn) clearBtn.style.display = 'none';
+      if (restoreBtn) restoreBtn.style.display = 'none';
+      return;
+    }
+    if (statusEl) {
+      const permLabel = status.permission === 'granted' ? '' : ' (tap Choose to reconnect)';
+      statusEl.textContent = status.name + permLabel;
+    }
+    if (chooseBtn) { chooseBtn.textContent = status.permission === 'granted' ? 'Change' : 'Reconnect'; chooseBtn.disabled = false; }
+    if (clearBtn) clearBtn.style.display = '';
+    if (restoreBtn) restoreBtn.style.display = '';
+  });
+}
+
 // === SETTINGS MODAL ===
 function openSettings() {
+  renderBackupStatus();
+  $('settings-version').textContent = 'v' + APP_VERSION;
   $('toggle-theme').checked = settings.theme === 'light';
   VOLUME_KEYS.forEach(k => {
     $('vol-val-' + k).textContent = settings.volumes[k] + '%';
@@ -922,6 +1131,7 @@ function adjustGoal(dir) {
 document.addEventListener('DOMContentLoaded', () => {
   loadSettings();
   applyTheme();
+  attemptStartupRestore();
 
   // Check for saved session
   const saved = Storage.load();
@@ -1064,6 +1274,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Storage.saveToHistory(session);
     UI.renderSummary();
     showScreen('summary');
+    runAutoBackup();
   });
 
   // Discard session from save/discard screen
@@ -1088,6 +1299,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // View history
   $('history-btn').addEventListener('click', () => {
     renderHistoryList();
+    renderBackupStatus();
     showScreen('history');
   });
 
@@ -1153,6 +1365,59 @@ document.addEventListener('DOMContentLoaded', () => {
   $('import-file-input').addEventListener('change', (e) => {
     if (e.target.files[0]) Export.fromJSON(e.target.files[0]);
     e.target.value = '';
+  });
+
+  // Restore from backup folder — bypasses OS file picker (kiosk has no mouse)
+  $('restore-btn').addEventListener('click', async () => {
+    const perm = await Backup.checkPermission(true);
+    if (perm !== 'granted') {
+      Export._showBanner('Backup folder permission denied.', true);
+      return;
+    }
+    const result = await Backup.restoreToHistory();
+    if (!result.ok) {
+      const msg = result.reason === 'no-file' ? 'No backup file in folder yet.'
+        : result.reason === 'invalid' ? 'Backup file is invalid.'
+        : 'Restore failed.';
+      Export._showBanner(msg, true);
+      return;
+    }
+    Export._showBanner(result.added === 0
+      ? 'Already up to date.'
+      : `Restored ${result.added} session(s) from backup.`);
+    renderHistoryList();
+  });
+
+  // Backup folder pick / clear (Settings)
+  $('backup-choose-btn').addEventListener('click', async () => {
+    if (!Backup.isSupported()) {
+      $('backup-status').textContent = 'Not supported in this browser';
+      return;
+    }
+    // If we already have a handle but permission lapsed, try to silently re-grant
+    // first — saves the user from re-navigating the directory picker.
+    const status = await Backup.getStatus();
+    if (status.state === 'configured' && status.permission !== 'granted') {
+      const perm = await Backup.checkPermission(true);
+      if (perm === 'granted') {
+        await Backup.write(Storage.loadHistory());
+        renderBackupStatus();
+        return;
+      }
+    }
+    try {
+      await Backup.chooseFolder();
+      // Seed the backup file immediately so a Restore right after pick works.
+      await Backup.write(Storage.loadHistory());
+    } catch (e) {
+      // User cancelled the picker — leave status untouched
+      if (e && e.name === 'AbortError') { renderBackupStatus(); return; }
+    }
+    renderBackupStatus();
+  });
+  $('backup-clear-btn').addEventListener('click', async () => {
+    await Backup.clearFolder();
+    renderBackupStatus();
   });
 
   // Stats
@@ -1266,6 +1531,47 @@ function getLastActivityTime(s) {
     }
   });
   return latest;
+}
+
+// Recovery path after a fresh flash / lost localStorage: if we have a configured
+// backup folder, no local history, and read permission is already granted, silently
+// pull sessions back from the backup file. We never auto-restore over an existing
+// history (that would resurrect intentionally deleted sessions).
+function attemptStartupRestore() {
+  if (!Backup.isSupported()) return;
+  if (Storage.loadHistory().length > 0) return;
+  Backup.loadHandle().then(handle => {
+    if (!handle) return;
+    handle.queryPermission({ mode: 'readwrite' }).then(perm => {
+      if (perm !== 'granted') return;
+      Backup.restoreToHistory();
+    }).catch(() => {});
+  });
+}
+
+// Fire-and-forget auto-backup. Surfaces a small status line on the summary screen
+// so the kiosk operator knows whether the snapshot landed.
+function runAutoBackup() {
+  const el = $('summary-backup-status');
+  if (!el) return;
+  if (!Backup.isSupported()) { el.textContent = ''; return; }
+  Backup.loadHandle().then(handle => {
+    if (!handle) { el.textContent = ''; return; }
+    el.textContent = 'Backing up…';
+    el.className = 'summary-backup-status';
+    Backup.write(Storage.loadHistory()).then(result => {
+      if (result.ok) {
+        el.textContent = 'Backed up to ' + handle.name;
+        el.className = 'summary-backup-status ok';
+      } else if (result.reason === 'no-permission') {
+        el.textContent = 'Backup folder needs permission — open Settings';
+        el.className = 'summary-backup-status warn';
+      } else {
+        el.textContent = 'Backup failed (' + (result.reason || 'unknown') + ')';
+        el.className = 'summary-backup-status err';
+      }
+    });
+  });
 }
 
 function showAudioBanner() {
