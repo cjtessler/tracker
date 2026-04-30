@@ -101,6 +101,7 @@
   <div id="summary-screen" class="screen" style="display:none;">
     <div id="summary-content">
       <div id="summary-sections"></div>
+      <div id="summary-backup-status" class="summary-backup-status"></div>
       <button id="new-session-btn" class="btn btn-new-session">New Session</button>
     </div>
   </div>
@@ -118,6 +119,7 @@
     </div>
     <div id="history-banner" style="display:none;"></div>
     <div id="history-footer">
+      <button id="restore-btn" class="hist-btn" style="display:none;">Restore from Backup</button>
       <label for="import-file-input" id="import-btn" class="hist-btn">Import JSON</label>
       <input type="file" id="import-file-input" accept=".json" style="display:none;">
       <button id="export-csv-btn" class="hist-btn" style="display:none;">Export CSV</button>
@@ -214,6 +216,14 @@
             <span class="setting-label">Reload page</span>
             <button id="reload-page-btn" class="hist-btn">&#8635; Reload</button>
           </div>
+          <div class="setting-row backup-row">
+            <span class="setting-label">Backup folder</span>
+            <div class="backup-controls">
+              <button id="backup-choose-btn" class="hist-btn">Choose</button>
+              <button id="backup-clear-btn" class="hist-btn" style="display:none;">Clear</button>
+            </div>
+          </div>
+          <div id="backup-status" class="backup-status">Not set</div>
         </div>
         <div id="settings-col-right">
           <div class="threshold-grid">
