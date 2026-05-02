@@ -38,6 +38,10 @@ All application logic lives in these files:
 - Each session is locked to a single section (selected on start screen).
 - **Per-hour rate is the headline metric.** Presses per hour is the most important number for the operator — display it most prominently wherever session results are shown (especially the End Session / save-discard screen, the in-session stats bar, and the post-session Summary). Other stats (avg interval, presses per minute, totals) are supporting context, not the lead.
 
+## Versioning
+
+- `APP_VERSION` in [app.js](app.js) (top of file) is rendered in the Settings header. **Bump it on every user-visible change** (UI tweaks, new behavior, bug fixes that change interaction). Use semver: patch for fixes, minor for new behavior, major for breaking UX. Bump as part of the same commit so the displayed version always matches the deployed code.
+
 ## Planned Work
 
 See `TODO.md` for the feature backlog: pause timer, mute toggle, widgets, session history/stats, and export.

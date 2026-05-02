@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const SAVE_INTERVAL_MS = 5000;
