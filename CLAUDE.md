@@ -12,11 +12,21 @@ Open `index.html` directly in a browser. No build step or server required.
 
 ## Architecture
 
-All application logic lives in three files:
+All application logic lives in these files:
 
-- **app.js** — Single-file application using object-literal modules: `Storage` (localStorage wrapper), `SoundPlayer` (Web Audio API tones), `Timer` (elapsed time + minute alerts), `UI` (rendering + flash feedback), `Input` (keydown handler + undo). Global `session` object holds all state.
+- **app.js** — Single-file application using object-literal modules: `Storage` (localStorage wrapper), `SoundPlayer` (Web Audio API tones), `Timer` (elapsed time + minute alerts), `UI` (rendering + flash feedback), `Input` (keydown handler + undo), `PinGate` (4-digit unlock screen). Global `session` object holds all state.
+- **sync.js** — `window.Sync` module that mirrors completed sessions to Supabase via PostgREST (raw `fetch`, no SDK). Exposes `init`, `upsert`, `remove`, `removeAll`, `pull`, `flush`, `subscribe`. Used by Storage method wrappers in `app.js`.
+- **config.js** — Hardcoded constants: `supabaseUrl`, `supabaseAnonKey`, `pin`. Edited per-deployment and committed (anon key is public-by-design; PIN is a UX gate).
+- **supabase-schema.sql** — DDL for the `public.sessions` table + anon-role RLS policies. Paste into the Supabase SQL editor once.
 - **style.css** — Hardcoded to 800x480 dimensions. Dark theme with `#6367FF` accent color.
-- **index.html** — Five screen divs toggled via `showScreen()`: start, resume, session, save-discard, summary.
+- **index.html** — Screen divs toggled via `showScreen()`: pin, start, resume, session, save-discard, summary, history, history-detail, stats.
+
+### Sync & PIN
+
+- **Offline-first**: localStorage is the source of truth. `sync.js` is a write fan-out + a startup pull-and-merge. The app remains fully functional with `config.js` missing or with no network.
+- **Sync queue** persists in `pedal-tracker-sync-queue`; failed pushes retry every 30s and on `window.online`. Items that 4xx three times move to `pedal-tracker-sync-deadletter`.
+- **Pull-only-adds policy**: `Sync.pull()` never deletes local rows that are missing remotely. Trade-off: a "ghost" row can survive cross-device deletes; clear via History → Delete.
+- **PIN gate**: a 4-digit numeric PIN (defined in `config.js`) is required once per device on first load. Verified flag stored in `localStorage['pedal-tracker-pin-verified']`. Remove that key to re-prompt.
 
 ## Key Behaviors
 

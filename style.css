@@ -1342,3 +1342,111 @@ html, body {
 .goal-done-btn:active {
   background: var(--c-surface);
 }
+
+/* === PIN GATE === */
+#pin-screen {
+  align-items: center;
+  justify-content: center;
+  background: var(--c-bg);
+  gap: 20px;
+}
+
+.pin-prompt {
+  font-size: 28px;
+  font-weight: 700;
+  color: #6367FF;
+  letter-spacing: 0.5px;
+}
+
+.pin-dots {
+  display: flex;
+  gap: 22px;
+}
+
+.pin-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--c-text-d);
+  background: transparent;
+  transition: background 80ms ease, border-color 80ms ease, transform 80ms ease;
+}
+
+.pin-dot.filled {
+  background: #6367FF;
+  border-color: #6367FF;
+  transform: scale(1.05);
+}
+
+.pin-pad {
+  display: grid;
+  grid-template-columns: repeat(3, 110px);
+  grid-auto-rows: 70px;
+  gap: 10px;
+}
+
+.pin-key {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--c-body-text);
+  background: var(--c-surface);
+  border: 1px solid var(--c-surface-alt);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pin-key:active {
+  background: var(--c-surface-alt);
+  transform: scale(0.96);
+}
+
+.pin-key-blank {
+  background: transparent;
+  border-color: transparent;
+  pointer-events: none;
+}
+
+.pin-key-back {
+  font-size: 22px;
+  color: var(--c-text-c);
+}
+
+.shake {
+  animation: pin-shake 400ms ease;
+}
+
+@keyframes pin-shake {
+  0%, 100% { transform: translateX(0); }
+  20%      { transform: translateX(-8px); }
+  40%      { transform: translateX(8px); }
+  60%      { transform: translateX(-6px); }
+  80%      { transform: translateX(6px); }
+}
+
+[data-theme="light"] .pin-prompt { color: #4549cc; }
+[data-theme="light"] .pin-dot.filled { background: #4549cc; border-color: #4549cc; }
+
+/* === SYNC INDICATOR === Pill in #history-header reflecting Sync state. */
+.sync-indicator {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  background: var(--c-surface);
+  color: var(--c-text-c);
+  border: 1px solid var(--c-surface-alt);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.sync-indicator.synced  { color: #6367FF; border-color: #6367FF; }
+.sync-indicator.queued  { color: #FFB74D; border-color: #FFB74D; }
+.sync-indicator.offline { color: var(--c-text-d); border-color: var(--c-text-d); }
+.sync-indicator.error   { color: #ff6b6b; border-color: #ff6b6b; }
+
+[data-theme="light"] .sync-indicator.synced { color: #4549cc; border-color: #4549cc; }
+

@@ -11,8 +11,33 @@
   <!-- Flash overlay for pedal press feedback -->
   <div id="flash-overlay"></div>
 
+  <!-- ==================== PIN SCREEN ==================== -->
+  <div id="pin-screen" class="screen" style="display:none;">
+    <div class="pin-prompt">Enter PIN</div>
+    <div class="pin-dots">
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+      <span class="pin-dot"></span>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-key" data-digit="1">1</button>
+      <button class="pin-key" data-digit="2">2</button>
+      <button class="pin-key" data-digit="3">3</button>
+      <button class="pin-key" data-digit="4">4</button>
+      <button class="pin-key" data-digit="5">5</button>
+      <button class="pin-key" data-digit="6">6</button>
+      <button class="pin-key" data-digit="7">7</button>
+      <button class="pin-key" data-digit="8">8</button>
+      <button class="pin-key" data-digit="9">9</button>
+      <button class="pin-key pin-key-blank" aria-hidden="true" tabindex="-1"></button>
+      <button class="pin-key" data-digit="0">0</button>
+      <button class="pin-key pin-key-back" data-action="back" aria-label="Backspace">&#9003;</button>
+    </div>
+  </div>
+
   <!-- ==================== START SCREEN ==================== -->
-  <div id="start-screen" class="screen">
+  <div id="start-screen" class="screen" style="display:none;">
     <div id="start-clock" class="clock-bar">
       <span id="start-clock-text"></span>
       <button class="btn settings-gear-btn" aria-label="Settings">&#9881;</button>
@@ -111,6 +136,7 @@
     <div id="history-header">
       <button id="history-back-btn" class="hist-btn">&larr; Back</button>
       <span>Session History</span>
+      <span id="sync-indicator" class="sync-indicator" style="display:none;"></span>
       <button id="history-clear-btn" class="hist-btn hist-btn-danger">Clear All</button>
     </div>
     <div id="history-list"></div>
@@ -288,6 +314,8 @@
     </div>
   </div>
 
+  <script src="config.js"></script>
+  <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
