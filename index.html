@@ -45,18 +45,56 @@
     </div>
     <div class="start-content">
       <div id="section-selector" class="section-selector">
-        <button class="section-option" data-section="CB-105">CB-105</button>
-        <button class="section-option" data-section="PVS">PVS</button>
-        <button class="section-option" data-section="PVSI">PVSI</button>
-        <button class="section-option" data-section="SMS">SMS</button>
-        <button class="section-option" data-section="OP222">OP222</button>
+        <button class="section-option" data-section="CB-105">
+          <span class="section-tab"></span>
+          <span class="section-name">CB-105</span>
+          <span class="section-status">
+            <span class="status-idle">&#9675; STANDBY</span>
+            <span class="status-active">&#9679; READY</span>
+          </span>
+        </button>
+        <button class="section-option" data-section="PVS">
+          <span class="section-tab"></span>
+          <span class="section-name">PVS</span>
+          <span class="section-status">
+            <span class="status-idle">&#9675; STANDBY</span>
+            <span class="status-active">&#9679; READY</span>
+          </span>
+        </button>
+        <button class="section-option" data-section="PVSI">
+          <span class="section-tab"></span>
+          <span class="section-name">PVSI</span>
+          <span class="section-status">
+            <span class="status-idle">&#9675; STANDBY</span>
+            <span class="status-active">&#9679; READY</span>
+          </span>
+        </button>
+        <button class="section-option" data-section="SMS">
+          <span class="section-tab"></span>
+          <span class="section-name">SMS</span>
+          <span class="section-status">
+            <span class="status-idle">&#9675; STANDBY</span>
+            <span class="status-active">&#9679; READY</span>
+          </span>
+        </button>
+        <button class="section-option" data-section="OP222">
+          <span class="section-tab"></span>
+          <span class="section-name">OP222</span>
+          <span class="section-status">
+            <span class="status-idle">&#9675; STANDBY</span>
+            <span class="status-active">&#9679; READY</span>
+          </span>
+        </button>
       </div>
-      <button id="start-btn" class="btn btn-start" disabled>Tap to Start Session</button>
+      <button id="start-btn" class="btn btn-start" disabled>
+        <span class="start-btn-title"><span class="start-btn-icon">&#9654;</span><span>START SESSION</span></span>
+        <span class="start-btn-subtitle">SELECT A QUEUE TO BEGIN</span>
+      </button>
       <div class="start-actions">
-        <button id="stats-btn" class="btn-history">Stats</button>
-        <button id="history-btn" class="btn-history">History</button>
+        <button id="stats-btn" class="btn-history">STATS</button>
+        <button id="history-btn" class="btn-history">HISTORY</button>
+        <div id="last-session-info" class="last-session-info" style="display:none;"></div>
       </div>
-      <div id="last-session-info" class="last-session-info" style="display:none;"></div>
     </div>
   </div>
 

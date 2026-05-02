@@ -1052,12 +1052,51 @@ function updateClock() {
   $('session-clock').textContent = date + '  \u2022  ' + time;
 }
 
+// === START SCREEN: section selection UI ===
+function applySectionSelectionUI() {
+  document.querySelectorAll('.section-option').forEach(b => {
+    b.classList.toggle('active', b.dataset.section === selectedSection);
+  });
+  const startBtn = $('start-btn');
+  const subtitle = startBtn.querySelector('.start-btn-subtitle');
+  if (selectedSection) {
+    startBtn.disabled = false;
+    if (subtitle) subtitle.textContent = selectedSection + ' \u00b7 TAP TO BEGIN';
+  } else {
+    startBtn.disabled = true;
+    if (subtitle) subtitle.textContent = 'SELECT A QUEUE TO BEGIN';
+  }
+}
+
+// === START SCREEN: last session summary card ===
+function updateLastSessionInfo() {
+  const info = $('last-session-info');
+  if (!info) return;
+  const history = Storage.loadHistory();
+  if (history.length === 0) {
+    info.style.display = 'none';
+    return;
+  }
+  const last = history[0];
+  const start = new Date(last.startTime);
+  const sec = last.sections[last.activeSection];
+  const dateStr = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).toUpperCase();
+  info.innerHTML =
+    '<div class="last-session-label">LAST SESSION</div>' +
+    '<div class="last-session-data">' + last.activeSection + ' \u00b7 ' + dateStr + ' \u00b7 ' + sec.count + ' PRESSES</div>';
+  info.style.display = '';
+}
+
 function showScreen(name) {
   ['pin-screen', 'start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen', 'stats-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
   if (name === 'session') UI.render();
+  if (name === 'start') {
+    applySectionSelectionUI();
+    updateLastSessionInfo();
+  }
   if (name === 'start' || name === 'session') {
     updateClock();
     clearInterval(clockInterval);
@@ -1130,9 +1169,7 @@ function cycleSection() {
   const currentIdx = selectedSection ? SECTIONS.indexOf(selectedSection) : -1;
   const nextIdx = (currentIdx + 1) % SECTIONS.length;
   selectedSection = SECTIONS[nextIdx];
-  document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
-  document.querySelector(`.section-option[data-section="${selectedSection}"]`).classList.add('active');
-  $('start-btn').disabled = false;
+  applySectionSelectionUI();
   SoundPlayer.init();
   SoundPlayer.playPressClick();
 }
@@ -1348,8 +1385,6 @@ function startupAfterPin() {
       $('discard-btn').addEventListener('click', () => {
         Storage.clear();
         selectedSection = null;
-        document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
-        $('start-btn').disabled = true;
         showScreen('start');
       });
     } else {
@@ -1395,10 +1430,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Section selector on start screen
   document.querySelectorAll('.section-option').forEach(btn => {
     btn.addEventListener('click', () => {
-      document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
       selectedSection = btn.dataset.section;
-      $('start-btn').disabled = false;
+      applySectionSelectionUI();
     });
   });
 
@@ -1480,8 +1513,6 @@ document.addEventListener('DOMContentLoaded', () => {
     Storage.clear();
     session = null;
     selectedSection = null;
-    document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
-    $('start-btn').disabled = true;
     showScreen('start');
   });
 
@@ -1489,8 +1520,6 @@ document.addEventListener('DOMContentLoaded', () => {
   $('new-session-btn').addEventListener('click', () => {
     Storage.clear();
     selectedSection = null;
-    document.querySelectorAll('.section-option').forEach(b => b.classList.remove('active'));
-    $('start-btn').disabled = true;
     showScreen('start');
   });
 
