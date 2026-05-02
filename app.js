@@ -1027,15 +1027,12 @@ const Input = {
     const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
     const durMin = durMs / 60000;
     const metrics = computeMetrics(session.activeSection);
-    const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
+    const perHour = durMin > 0.01 ? Math.round(sec.count / durMin * 60) : 0;
+    const rateDisplay = perHour > 0 ? perHour : '--';
     const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
     $('save-discard-stats').innerHTML =
-      `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
-      `<div class="save-discard-details">` +
-        `<span>Rate: ${rate}</span>` +
-        `<span>Avg: ${avg}</span>` +
-        `<span>Total: ${sec.count}</span>` +
-      `</div>`;
+      `<div class="save-discard-rate">${rateDisplay}<span class="rate-unit">/hr</span></div>` +
+      `<div class="save-discard-meta">${session.activeSection} &middot; ${sec.count} presses &middot; ${formatDuration(durMs)} &middot; avg ${avg}</div>`;
 
     showScreen('save-discard');
   }
@@ -1466,15 +1463,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
       const durMin = durMs / 60000;
       const metrics = computeMetrics(session.activeSection);
-      const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
+      const perHour = durMin > 0.01 ? Math.round(sec.count / durMin * 60) : 0;
+      const rateDisplay = perHour > 0 ? perHour : '--';
       const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
       $('save-discard-stats').innerHTML =
-        `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
-        `<div class="save-discard-details">` +
-          `<span>Rate: ${rate}</span>` +
-          `<span>Avg: ${avg}</span>` +
-          `<span>Total: ${sec.count}</span>` +
-        `</div>`;
+        `<div class="save-discard-rate">${rateDisplay}<span class="rate-unit">/hr</span></div>` +
+        `<div class="save-discard-meta">${session.activeSection} &middot; ${sec.count} presses &middot; ${formatDuration(durMs)} &middot; avg ${avg}</div>`;
       showScreen('save-discard');
     }, HOLD_THRESHOLD_MS);
   }

@@ -36,6 +36,7 @@ All application logic lives in these files:
 - The "End Session" button requires a **double-tap confirmation** (3-second window).
 - Timer turns warning color at 45s and alert/pulsing at 60s since last press.
 - Each session is locked to a single section (selected on start screen).
+- **Per-hour rate is the headline metric.** Presses per hour is the most important number for the operator — display it most prominently wherever session results are shown (especially the End Session / save-discard screen, the in-session stats bar, and the post-session Summary). Other stats (avg interval, presses per minute, totals) are supporting context, not the lead.
 
 ## Planned Work
 
