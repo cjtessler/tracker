@@ -1413,6 +1413,23 @@ html, body {
   color: var(--c-text-c);
 }
 
+.pin-cancel {
+  margin-top: 4px;
+  background: transparent;
+  border: none;
+  color: var(--c-text-c);
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.pin-cancel:active {
+  color: var(--c-body-text);
+}
+
 .shake {
   animation: pin-shake 400ms ease;
 }

@@ -2,10 +2,11 @@
 // Offline-first: localStorage stays the source of truth; this is a fan-out
 // + startup pull-and-merge. No SDK; raw fetch keeps the app dependency-free.
 window.Sync = (() => {
-  const QUEUE_KEY    = 'pedal-tracker-sync-queue';
-  const DEAD_KEY     = 'pedal-tracker-sync-deadletter';
-  const DEVICE_KEY   = 'pedal-tracker-device-id';
-  const HISTORY_KEY  = 'pedal-tracker-history';
+  const QUEUE_KEY      = 'pedal-tracker-sync-queue';
+  const DEAD_KEY       = 'pedal-tracker-sync-deadletter';
+  const DEVICE_KEY     = 'pedal-tracker-device-id';
+  const HISTORY_KEY    = 'pedal-tracker-history';
+  const SYNCED_IDS_KEY = 'pedal-tracker-synced-ids';
   const PULL_LIMIT   = 500;
   const RETRY_MS     = 30000;
   const REQUEST_MS   = 10000;
@@ -14,6 +15,7 @@ window.Sync = (() => {
   let cfg = null;
   let state = 'disabled';
   let queue = [];
+  let syncedIds = new Set();
   const listeners = [];
   let retryTimer = null;
   let flushing = false;
@@ -34,6 +36,25 @@ window.Sync = (() => {
   function loadQueue() {
     try { queue = JSON.parse(localStorage.getItem(QUEUE_KEY)) || []; }
     catch (e) { queue = []; }
+  }
+  function loadSyncedIds() {
+    try {
+      const arr = JSON.parse(localStorage.getItem(SYNCED_IDS_KEY)) || [];
+      syncedIds = new Set(arr.map(Number));
+    } catch (e) { syncedIds = new Set(); }
+  }
+  function persistSyncedIds() {
+    try { localStorage.setItem(SYNCED_IDS_KEY, JSON.stringify(Array.from(syncedIds))); }
+    catch (e) {}
+  }
+  function markSynced(id) {
+    if (id == null) return;
+    syncedIds.add(Number(id));
+    persistSyncedIds();
+  }
+  function markUnsynced(id) {
+    if (id == null) return;
+    if (syncedIds.delete(Number(id))) persistSyncedIds();
   }
   function pushDead(item, reason) {
     let dead = [];
@@ -108,6 +129,7 @@ window.Sync = (() => {
         err.status = res.status;
         throw err;
       }
+      markSynced(item.payload && item.payload.id);
       return;
     }
     if (item.op === 'delete') {
@@ -120,6 +142,7 @@ window.Sync = (() => {
         err.status = res.status;
         throw err;
       }
+      markUnsynced(item.payload);
       return;
     }
   }
@@ -127,6 +150,30 @@ window.Sync = (() => {
   function scheduleRetry() {
     clearTimeout(retryTimer);
     retryTimer = setTimeout(flush, RETRY_MS);
+  }
+
+  // Queue upserts for any local sessions that haven't been confirmed on the
+  // server yet. Run on init so existing-on-device data gets backed up.
+  function queueLocalBackup() {
+    let local = [];
+    try { local = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
+    catch (e) { return 0; }
+    if (!local.length) return 0;
+    const queuedUpsertIds = new Set(
+      queue.filter(i => i.op === 'upsert' && i.payload && i.payload.id != null)
+           .map(i => Number(i.payload.id))
+    );
+    let added = 0;
+    for (const s of local) {
+      if (!s || s.id == null) continue;
+      const id = Number(s.id);
+      if (syncedIds.has(id) || queuedUpsertIds.has(id)) continue;
+      queue.push({ op: 'upsert', payload: s });
+      queuedUpsertIds.add(id);
+      added++;
+    }
+    if (added) persistQueue();
+    return added;
   }
 
   async function flush() {
@@ -188,7 +235,27 @@ window.Sync = (() => {
     }
     let rows;
     try { rows = await res.json(); } catch (e) { return; }
-    if (!Array.isArray(rows) || !rows.length) { notify(); return; }
+    if (!Array.isArray(rows)) { notify(); return; }
+
+    // Server-confirmed rows are synced by definition — record them so we
+    // don't redundantly re-upload on later inits.
+    let dirtySynced = false;
+    rows.forEach(r => {
+      if (r && r.id != null) {
+        const id = Number(r.id);
+        if (!syncedIds.has(id)) { syncedIds.add(id); dirtySynced = true; }
+      }
+    });
+    if (dirtySynced) persistSyncedIds();
+
+    if (!rows.length) { notify(); return; }
+
+    // Don't resurrect rows the user has locally deleted but whose delete
+    // hasn't been flushed yet (offline / retry).
+    const pendingDeletes = new Set(
+      queue.filter(i => i.op === 'delete' && i.payload != null)
+           .map(i => Number(i.payload))
+    );
 
     let local = [];
     try { local = JSON.parse(localStorage.getItem(HISTORY_KEY)) || []; }
@@ -197,6 +264,7 @@ window.Sync = (() => {
     let added = 0;
     for (const r of rows) {
       const s = fromRow(r);
+      if (pendingDeletes.has(s.id)) continue;
       if (!seen.has(s.id)) { local.push(s); seen.add(s.id); added++; }
     }
     if (added) {
@@ -210,13 +278,21 @@ window.Sync = (() => {
     init() {
       cfg = window.APP_CONFIG || null;
       loadQueue();
+      loadSyncedIds();
       if (!configured()) { setState('disabled'); return; }
-      setState(queue.length ? 'idle' : 'idle');
+      // Backup any local sessions not yet confirmed on the server.
+      queueLocalBackup();
+      setState('idle');
+      notify();
       window.addEventListener('online', () => flush());
-      pull().then(() => flush());
+      // Drain queue first (so pending deletes propagate before pulling),
+      // then pull, then flush again to cover anything queued during pull.
+      flush().then(pull).then(flush);
     },
     upsert(s) {
       if (state === 'disabled') return;
+      // Treat as unsynced until the server confirms via performOp().
+      markUnsynced(s && s.id);
       queue.push({ op: 'upsert', payload: s });
       persistQueue();
       notify();
