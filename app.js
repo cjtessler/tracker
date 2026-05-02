@@ -120,6 +120,90 @@ const Storage = {
   }
 };
 
+// === SYNC HOOKS — fan completed-history writes out to Supabase. ===
+// Local writes always run first; Sync calls are fire-and-forget downstream.
+const _origSaveToHistory = Storage.saveToHistory;
+Storage.saveToHistory = function(s) {
+  _origSaveToHistory.call(this, s);
+  if (window.Sync) Sync.upsert(s);
+};
+const _origDeleteFromHistory = Storage.deleteFromHistory;
+Storage.deleteFromHistory = function(id) {
+  _origDeleteFromHistory.call(this, id);
+  if (window.Sync) Sync.remove(id);
+};
+const _origClearHistory = Storage.clearHistory;
+Storage.clearHistory = function() {
+  const ids = Storage.loadHistory().map(s => s.id);
+  _origClearHistory.call(this);
+  if (window.Sync) Sync.removeAll(ids);
+};
+
+// === PIN GATE === Touchscreen-friendly 4-digit unlock. UX-level only.
+const PIN_VERIFIED_KEY = 'pedal-tracker-pin-verified';
+const PinGate = {
+  check() {
+    return localStorage.getItem(PIN_VERIFIED_KEY) === '1';
+  },
+  show(onUnlock) {
+    const expected = (window.APP_CONFIG && window.APP_CONFIG.pin) || '';
+    if (!expected) {
+      // No PIN configured — auto-pass so the app remains usable.
+      localStorage.setItem(PIN_VERIFIED_KEY, '1');
+      onUnlock();
+      return;
+    }
+    const screen = document.getElementById('pin-screen');
+    const dots = screen.querySelectorAll('.pin-dot');
+    const dotsWrap = screen.querySelector('.pin-dots');
+    let current = '';
+
+    const paint = () => {
+      dots.forEach((d, i) => {
+        d.classList.toggle('filled', i < current.length);
+      });
+    };
+    const reject = () => {
+      dotsWrap.classList.add('shake');
+      setTimeout(() => {
+        dotsWrap.classList.remove('shake');
+        current = '';
+        paint();
+      }, 400);
+    };
+    const accept = () => {
+      localStorage.setItem(PIN_VERIFIED_KEY, '1');
+      screen.style.display = 'none';
+      onUnlock();
+    };
+
+    // Hide every other screen so the gate is the only thing visible.
+    document.querySelectorAll('.screen').forEach(el => {
+      if (el.id !== 'pin-screen') el.style.display = 'none';
+    });
+    screen.style.display = 'flex';
+    paint();
+
+    screen.addEventListener('click', (e) => {
+      const key = e.target.closest('.pin-key');
+      if (!key) return;
+      if (key.dataset.action === 'back') {
+        current = current.slice(0, -1);
+        paint();
+        return;
+      }
+      const digit = key.dataset.digit;
+      if (digit == null || current.length >= expected.length) return;
+      current += digit;
+      paint();
+      if (current.length === expected.length) {
+        if (current === String(expected)) accept();
+        else reject();
+      }
+    });
+  }
+};
+
 // === SETTINGS ===
 function loadSettings() {
   try {
@@ -896,7 +980,7 @@ function updateClock() {
 }
 
 function showScreen(name) {
-  ['start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen', 'stats-screen'].forEach(id => {
+  ['pin-screen', 'start-screen', 'resume-screen', 'session-screen', 'save-discard-screen', 'summary-screen', 'history-screen', 'history-detail-screen', 'stats-screen'].forEach(id => {
     $(id).style.display = 'none';
   });
   $(name + '-screen').style.display = 'flex';
@@ -908,6 +992,39 @@ function showScreen(name) {
   } else {
     clearInterval(clockInterval);
     clockInterval = null;
+  }
+}
+
+// === SYNC INDICATOR === Pill shown in #history-header reflecting Sync state.
+function updateSyncIndicator(state, queueLen) {
+  const el = document.getElementById('sync-indicator');
+  if (!el) return;
+  el.classList.remove('synced', 'queued', 'offline', 'error');
+  if (state === 'disabled') {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = '';
+  if (state === 'syncing') {
+    el.classList.add('queued');
+    el.textContent = 'Syncing…';
+  } else if (state === 'offline') {
+    el.classList.add('offline');
+    el.textContent = queueLen ? 'Offline · ' + queueLen : 'Offline';
+  } else if (state === 'error') {
+    el.classList.add('error');
+    el.textContent = queueLen ? 'Retry · ' + queueLen : 'Retry';
+  } else if (queueLen > 0) {
+    el.classList.add('queued');
+    el.textContent = 'Queued · ' + queueLen;
+  } else {
+    el.classList.add('synced');
+    el.textContent = 'Synced';
+  }
+  // Repaint history list so newly-pulled remote sessions appear immediately.
+  const historyVisible = document.getElementById('history-screen').style.display !== 'none';
+  if (historyVisible && typeof renderHistoryList === 'function') {
+    try { renderHistoryList(); } catch (e) {}
   }
 }
 
@@ -1128,10 +1245,13 @@ function adjustGoal(dir) {
 }
 
 // === INITIALIZATION ===
-document.addEventListener('DOMContentLoaded', () => {
-  loadSettings();
-  applyTheme();
+function startupAfterPin() {
   attemptStartupRestore();
+
+  if (window.Sync) {
+    Sync.init();
+    Sync.subscribe(({state, queueLen}) => updateSyncIndicator(state, queueLen));
+  }
 
   // Check for saved session
   const saved = Storage.load();
@@ -1175,6 +1295,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   } else {
     showScreen('start');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadSettings();
+  applyTheme();
+  if (PinGate.check()) {
+    startupAfterPin();
+  } else {
+    PinGate.show(startupAfterPin);
   }
 
   // Start button
