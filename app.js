@@ -19,8 +19,6 @@ let lastPressTime = 0;
 let lastAlertedMinute = 0;
 let endConfirmTimer = null;
 let endConfirmPending = false;
-let clearConfirmPending = false;
-let clearConfirmTimer = null;
 let deleteConfirmPending = false;
 let deleteConfirmTimer = null;
 let audioCtx = null;
@@ -142,27 +140,71 @@ Storage.clearHistory = function() {
 // === PIN GATE === Touchscreen-friendly 4-digit unlock. UX-level only.
 const PIN_VERIFIED_KEY = 'pedal-tracker-pin-verified';
 const PinGate = {
+  _activeHandler: null,
+
   check() {
     return localStorage.getItem(PIN_VERIFIED_KEY) === '1';
   },
+
+  // Initial app unlock. Persists verified flag for the device.
   show(onUnlock) {
+    PinGate._present({ persist: true, prompt: 'Enter PIN', onSuccess: onUnlock });
+  },
+
+  // One-shot verification for sensitive actions (e.g., Clear All). Does
+  // not change the persisted verified flag and offers a Cancel option.
+  verify(opts) {
+    const o = opts || {};
+    PinGate._present({
+      persist: false,
+      prompt: o.prompt || 'Enter PIN',
+      onSuccess: o.onSuccess || (() => {}),
+      onCancel: o.onCancel || (() => {})
+    });
+  },
+
+  _present({ persist, prompt, onSuccess, onCancel }) {
     const expected = (window.APP_CONFIG && window.APP_CONFIG.pin) || '';
     if (!expected) {
-      // No PIN configured — auto-pass so the app remains usable.
-      localStorage.setItem(PIN_VERIFIED_KEY, '1');
-      onUnlock();
+      // No PIN configured — pass through. Persist for initial unlock so
+      // the gate doesn't re-show, but for verify we just run the action.
+      if (persist) localStorage.setItem(PIN_VERIFIED_KEY, '1');
+      onSuccess();
       return;
     }
     const screen = document.getElementById('pin-screen');
+    const promptEl = document.getElementById('pin-prompt');
+    const cancelBtn = document.getElementById('pin-cancel-btn');
     const dots = screen.querySelectorAll('.pin-dot');
     const dotsWrap = screen.querySelector('.pin-dots');
     let current = '';
 
+    // Track which screen was visible so verify-mode can restore it.
+    const previouslyVisible = !persist
+      ? Array.from(document.querySelectorAll('.screen'))
+          .find(el => el.id !== 'pin-screen' && el.style.display !== 'none') || null
+      : null;
+
     const paint = () => {
-      dots.forEach((d, i) => {
-        d.classList.toggle('filled', i < current.length);
-      });
+      dots.forEach((d, i) => d.classList.toggle('filled', i < current.length));
     };
+
+    const cleanup = () => {
+      if (PinGate._activeHandler) {
+        screen.removeEventListener('click', PinGate._activeHandler);
+        PinGate._activeHandler = null;
+      }
+      promptEl.textContent = 'Enter PIN';
+      cancelBtn.style.display = 'none';
+      current = '';
+      paint();
+    };
+
+    const restorePrevious = () => {
+      screen.style.display = 'none';
+      if (previouslyVisible) previouslyVisible.style.display = 'flex';
+    };
+
     const reject = () => {
       dotsWrap.classList.add('shake');
       setTimeout(() => {
@@ -171,20 +213,29 @@ const PinGate = {
         paint();
       }, 400);
     };
+
     const accept = () => {
-      localStorage.setItem(PIN_VERIFIED_KEY, '1');
-      screen.style.display = 'none';
-      onUnlock();
+      cleanup();
+      if (persist) {
+        localStorage.setItem(PIN_VERIFIED_KEY, '1');
+        screen.style.display = 'none';
+      } else {
+        restorePrevious();
+      }
+      onSuccess();
     };
 
-    // Hide every other screen so the gate is the only thing visible.
-    document.querySelectorAll('.screen').forEach(el => {
-      if (el.id !== 'pin-screen') el.style.display = 'none';
-    });
-    screen.style.display = 'flex';
-    paint();
+    const cancel = () => {
+      cleanup();
+      restorePrevious();
+      onCancel();
+    };
 
-    screen.addEventListener('click', (e) => {
+    const clickHandler = (e) => {
+      if (!persist && e.target.closest('#pin-cancel-btn')) {
+        cancel();
+        return;
+      }
       const key = e.target.closest('.pin-key');
       if (!key) return;
       if (key.dataset.action === 'back') {
@@ -200,7 +251,29 @@ const PinGate = {
         if (current === String(expected)) accept();
         else reject();
       }
-    });
+    };
+
+    // If a previous flow's listener is still attached, drop it before reusing.
+    if (PinGate._activeHandler) {
+      screen.removeEventListener('click', PinGate._activeHandler);
+    }
+    PinGate._activeHandler = clickHandler;
+
+    promptEl.textContent = prompt;
+    if (persist) {
+      // Initial unlock — hide everything else so the gate stands alone.
+      document.querySelectorAll('.screen').forEach(el => {
+        if (el.id !== 'pin-screen') el.style.display = 'none';
+      });
+      cancelBtn.style.display = 'none';
+    } else {
+      // Verify mode — overlay on top of whatever screen is showing.
+      if (previouslyVisible) previouslyVisible.style.display = 'none';
+      cancelBtn.style.display = '';
+    }
+    screen.style.display = 'flex';
+    paint();
+    screen.addEventListener('click', clickHandler);
   }
 };
 
@@ -1070,11 +1143,6 @@ function renderHistoryList() {
   const list = $('history-list');
   const empty = $('history-empty');
 
-  // Reset clear confirmation
-  clearConfirmPending = false;
-  $('history-clear-btn').textContent = 'Clear All';
-  $('history-clear-btn').classList.remove('confirm');
-
   if (history.length === 0) {
     list.style.display = 'none';
     empty.style.display = 'flex';
@@ -1438,25 +1506,15 @@ document.addEventListener('DOMContentLoaded', () => {
     showScreen('start');
   });
 
-  // History clear all (double-tap confirmation)
+  // History clear all — PIN required (also wipes the cloud copy via Sync).
   $('history-clear-btn').addEventListener('click', () => {
-    if (!clearConfirmPending) {
-      clearConfirmPending = true;
-      $('history-clear-btn').textContent = 'Confirm?';
-      $('history-clear-btn').classList.add('confirm');
-      clearConfirmTimer = setTimeout(() => {
-        clearConfirmPending = false;
-        $('history-clear-btn').textContent = 'Clear All';
-        $('history-clear-btn').classList.remove('confirm');
-      }, CONFIRM_TIMEOUT_MS);
-      return;
-    }
-    clearTimeout(clearConfirmTimer);
-    clearConfirmPending = false;
-    $('history-clear-btn').textContent = 'Clear All';
-    $('history-clear-btn').classList.remove('confirm');
-    Storage.clearHistory();
-    renderHistoryList();
+    PinGate.verify({
+      prompt: 'Enter PIN to Clear All',
+      onSuccess: () => {
+        Storage.clearHistory();
+        renderHistoryList();
+      }
+    });
   });
 
   // History detail back

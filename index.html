@@ -13,7 +13,7 @@
 
   <!-- ==================== PIN SCREEN ==================== -->
   <div id="pin-screen" class="screen" style="display:none;">
-    <div class="pin-prompt">Enter PIN</div>
+    <div id="pin-prompt" class="pin-prompt">Enter PIN</div>
     <div class="pin-dots">
       <span class="pin-dot"></span>
       <span class="pin-dot"></span>
@@ -34,6 +34,7 @@
       <button class="pin-key" data-digit="0">0</button>
       <button class="pin-key pin-key-back" data-action="back" aria-label="Backspace">&#9003;</button>
     </div>
+    <button id="pin-cancel-btn" class="pin-cancel" data-action="cancel" style="display:none;">Cancel</button>
   </div>
 
   <!-- ==================== START SCREEN ==================== -->
