@@ -1057,18 +1057,12 @@ function applySectionSelectionUI() {
   document.querySelectorAll('.section-option').forEach(b => {
     b.classList.toggle('active', b.dataset.section === selectedSection);
   });
-  const startBtn = $('start-btn');
-  const subtitle = startBtn.querySelector('.start-btn-subtitle');
-  if (selectedSection) {
-    startBtn.disabled = false;
-    if (subtitle) subtitle.textContent = selectedSection + ' \u00b7 TAP TO BEGIN';
-  } else {
-    startBtn.disabled = true;
-    if (subtitle) subtitle.textContent = 'SELECT A QUEUE TO BEGIN';
-  }
+  $('start-btn').disabled = !selectedSection;
 }
 
 // === START SCREEN: last session summary card ===
+let historyDetailReturnTo = 'history';
+
 function updateLastSessionInfo() {
   const info = $('last-session-info');
   if (!info) return;
@@ -1220,7 +1214,10 @@ function renderHistoryList() {
     item.addEventListener('click', () => {
       const id = Number(item.dataset.id);
       const s = history.find(h => h.id === id);
-      if (s) renderHistoryDetail(s);
+      if (s) {
+        historyDetailReturnTo = 'history';
+        renderHistoryDetail(s);
+      }
     });
   });
 }
@@ -1548,8 +1545,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // History detail back
   $('detail-back-btn').addEventListener('click', () => {
-    renderHistoryList();
-    showScreen('history');
+    if (historyDetailReturnTo === 'start') {
+      showScreen('start');
+    } else {
+      renderHistoryList();
+      showScreen('history');
+    }
+  });
+
+  // Last session card on start screen → opens detail
+  $('last-session-info').addEventListener('click', () => {
+    const history = Storage.loadHistory();
+    if (history.length === 0) return;
+    historyDetailReturnTo = 'start';
+    renderHistoryDetail(history[0]);
   });
 
   // History detail delete (double-tap confirmation)
@@ -1572,8 +1581,12 @@ document.addEventListener('DOMContentLoaded', () => {
     $('detail-delete-btn').classList.remove('confirm');
     Storage.deleteFromHistory(viewingHistorySession.id);
     viewingHistorySession = null;
-    renderHistoryList();
-    showScreen('history');
+    if (historyDetailReturnTo === 'start') {
+      showScreen('start');
+    } else {
+      renderHistoryList();
+      showScreen('history');
+    }
   });
 
   // Export / Import

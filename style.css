@@ -204,23 +204,13 @@ html, body {
   transition: color 0.15s;
 }
 
-.start-btn-subtitle {
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 2px;
-  color: var(--c-text-f);
-  text-transform: uppercase;
-  transition: color 0.15s;
-}
-
 .btn-start:not(:disabled) {
   background: var(--c-nav);
   border-color: #6367FF;
 }
 
 .btn-start:not(:disabled) .start-btn-title,
-.btn-start:not(:disabled) .start-btn-icon,
-.btn-start:not(:disabled) .start-btn-subtitle {
+.btn-start:not(:disabled) .start-btn-icon {
   color: #fff;
 }
 
@@ -292,23 +282,12 @@ html, body {
 }
 
 .section-name {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
   letter-spacing: 1.5px;
   color: var(--c-text-b);
   transition: color 0.15s;
 }
-
-.section-status {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 1.8px;
-  color: var(--c-text-f);
-  text-transform: uppercase;
-  transition: color 0.15s;
-}
-
-.section-status .status-active { display: none; }
 
 .section-option.active {
   border-color: #6367FF;
@@ -317,12 +296,6 @@ html, body {
 
 .section-option.active .section-name {
   color: #fff;
-}
-
-.section-option.active .section-status .status-idle { display: none; }
-.section-option.active .section-status .status-active {
-  display: inline;
-  color: #6367FF;
 }
 
 .section-option.active .section-tab {
@@ -354,6 +327,15 @@ html, body {
   background: linear-gradient(180deg, var(--c-surface-alt) 0%, var(--c-surface) 100%);
   text-align: left;
   margin: 0;
+  font-family: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.last-session-info:active {
+  background: var(--c-surface-alt);
+  border-color: #6367FF;
 }
 
 .last-session-label {
