@@ -104,6 +104,7 @@ html, body {
   background: #8494FF;
   opacity: 0;
   z-index: 100;
+  will-change: opacity;
 }
 
 #flash-overlay.flash {
@@ -222,6 +223,7 @@ html, body {
   transform: scaleX(0);
   transform-origin: left;
   z-index: -1;
+  will-change: transform;
 }
 
 .btn-start.filling::after {
@@ -419,7 +421,6 @@ html, body {
 
 #timer-value.alert {
   color: #FF3D3D;
-  animation: pulse 0.8s ease-in-out infinite;
 }
 
 @keyframes pulse {
@@ -533,6 +534,7 @@ html, body {
   transform: scaleX(0);
   transform-origin: left;
   z-index: -1;
+  will-change: transform;
 }
 
 .btn-end.filling {
@@ -557,6 +559,7 @@ html, body {
   color: #fff;
   border-color: #6367FF;
   animation: pulse 0.8s ease-in-out infinite;
+  will-change: opacity;
 }
 
 /* === AUDIO BANNER === */
