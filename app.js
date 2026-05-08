@@ -1,8 +1,7 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
-const SAVE_INTERVAL_MS = 5000;
 const STORAGE_KEY = 'pedal-tracker-session';
 const HISTORY_KEY = 'pedal-tracker-history';
 const SETTINGS_KEY = 'pedal-tracker-settings';
@@ -725,7 +724,8 @@ const Timer = {
   start() {
     Timer.stop();
     lastAlertedMinute = 0;
-    timerInterval = setInterval(Timer.update, 100);
+    Timer.update();
+    timerInterval = setInterval(Timer.update, 1000);
   },
 
   stop() {
@@ -1124,10 +1124,11 @@ function updateSyncIndicator(state, queueLen) {
     el.classList.add('synced');
     el.textContent = 'Synced';
   }
-  // Repaint history list so newly-pulled remote sessions appear immediately.
+  // Repaint history list only when content actually changed (gates out
+  // sync-state-only updates like syncing/synced toggles).
   const historyVisible = document.getElementById('history-screen').style.display !== 'none';
-  if (historyVisible && typeof renderHistoryList === 'function') {
-    try { renderHistoryList(); } catch (e) {}
+  if (historyVisible && typeof rerenderHistoryIfChanged === 'function') {
+    try { rerenderHistoryIfChanged(); } catch (e) {}
   }
 }
 
@@ -1166,8 +1167,25 @@ function cycleSection() {
 }
 
 // === HISTORY ===
+let lastHistorySig = '';
+
+function historySig(history) {
+  if (history.length === 0) return '0';
+  const first = history[0];
+  const last = history[history.length - 1];
+  return history.length + ':' + (first.id || '') + ':' + (first.endTime || '') +
+         ':' + (last.id || '') + ':' + (last.endTime || '');
+}
+
+function rerenderHistoryIfChanged() {
+  const sig = historySig(Storage.loadHistory());
+  if (sig === lastHistorySig) return;
+  renderHistoryList();
+}
+
 function renderHistoryList() {
   const history = Storage.loadHistory();
+  lastHistorySig = historySig(history);
   const list = $('history-list');
   const empty = $('history-empty');
 
@@ -1662,11 +1680,6 @@ document.addEventListener('DOMContentLoaded', () => {
       renderStatsChart();
     });
   });
-
-  // Periodic save
-  setInterval(() => {
-    if (session && session.active) Storage.save(session);
-  }, SAVE_INTERVAL_MS);
 
   // Settings modal
   document.querySelectorAll('.settings-gear-btn').forEach(btn => {
