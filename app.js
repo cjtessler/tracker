@@ -1140,21 +1140,21 @@ function renderHistoryList() {
   list.innerHTML = history.map(s => {
     const start = new Date(s.startTime);
     const end = s.endTime ? new Date(s.endTime) : start;
-    const durMs = end.getTime() - start.getTime();
+    const durMin = (end.getTime() - start.getTime()) / 60000;
     const sec = s.sections[s.activeSection];
-    const durMin = durMs / 60000;
-    const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--';
+    const perHour = durMin > 0.01 ? Math.round(sec.count / durMin * 60) : null;
+    const rateStr = perHour !== null ? perHour + '/hr' : '--/hr';
     const dateStr = start.toLocaleDateString('en-US', {
       month: 'short', day: 'numeric', year: 'numeric'
-    }) + ' ' + start.toLocaleTimeString('en-US', {
+    }) + ' · ' + start.toLocaleTimeString('en-US', {
       hour: 'numeric', minute: '2-digit'
     });
     return `<div class="history-item" data-id="${s.id}">
       <div class="history-item-top">
-        <span class="history-item-date">${dateStr}</span>
+        <span class="history-item-rate">${rateStr}</span>
         <span class="history-item-section">${s.activeSection}</span>
       </div>
-      <div class="history-item-stats">${sec.count} presses &middot; ${formatDuration(durMs)} &middot; ${rate}</div>
+      <div class="history-item-date">${dateStr}</div>
     </div>`;
   }).join('');
 
