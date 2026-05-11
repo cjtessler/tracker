@@ -154,7 +154,6 @@
     <div id="history-header">
       <button id="history-back-btn" class="hist-btn">&larr; Back</button>
       <span>Session History</span>
-      <span id="sync-indicator" class="sync-indicator" style="display:none;"></span>
       <button id="history-clear-btn" class="hist-btn hist-btn-danger">Clear All</button>
     </div>
     <div id="history-list"></div>
@@ -163,6 +162,8 @@
     </div>
     <div id="history-banner" style="display:none;"></div>
     <div id="history-footer">
+      <span id="sync-status" class="sync-status">Last synced: never</span>
+      <button id="sync-now-btn" class="hist-btn">Sync Now</button>
       <button id="restore-btn" class="hist-btn" style="display:none;">Restore from Backup</button>
       <label for="import-file-input" id="import-btn" class="hist-btn">Import JSON</label>
       <input type="file" id="import-file-input" accept=".json" style="display:none;">
@@ -333,6 +334,7 @@
   </div>
 
   <script src="config.js"></script>
+  <script src="config.local.js"></script>
   <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>

@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -1008,35 +1008,58 @@ function showScreen(name) {
   }
 }
 
-// === SYNC INDICATOR === Pill shown in #history-header reflecting Sync state.
-function updateSyncIndicator(state, queueLen) {
-  const el = document.getElementById('sync-indicator');
-  if (!el) return;
-  el.classList.remove('synced', 'queued', 'offline', 'error');
+// === SYNC STATUS === Footer row in History reflecting Sync state + last-sync time.
+function formatLastSync(iso) {
+  if (!iso) return 'never';
+  const then = new Date(iso);
+  if (isNaN(then.getTime())) return 'never';
+  const now = new Date();
+  const timeStr = then.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (then.toDateString() === now.toDateString()) return 'today at ' + timeStr;
+  const yest = new Date(now); yest.setDate(yest.getDate() - 1);
+  if (then.toDateString() === yest.toDateString()) return 'yesterday at ' + timeStr;
+  const dateStr = then.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  return dateStr + ' at ' + timeStr;
+}
+
+function renderSyncStatus(snapshot) {
+  const status = document.getElementById('sync-status');
+  const btn = document.getElementById('sync-now-btn');
+  if (!status || !btn) return;
+  const state = snapshot.state;
+  const queueLen = snapshot.queueLen;
+  const lastSyncAt = snapshot.lastSyncAt;
   if (state === 'disabled') {
-    el.style.display = 'none';
+    status.style.display = 'none';
+    btn.style.display = 'none';
     return;
   }
-  el.style.display = '';
+  status.style.display = '';
+  btn.style.display = '';
   if (state === 'syncing') {
-    el.classList.add('queued');
-    el.textContent = 'Syncing…';
-  } else if (state === 'offline') {
-    el.classList.add('offline');
-    el.textContent = queueLen ? 'Offline · ' + queueLen : 'Offline';
-  } else if (state === 'error') {
-    el.classList.add('error');
-    el.textContent = queueLen ? 'Retry · ' + queueLen : 'Retry';
-  } else if (queueLen > 0) {
-    el.classList.add('queued');
-    el.textContent = 'Queued · ' + queueLen;
+    status.textContent = 'Syncing…';
+    btn.classList.add('syncing');
+    btn.disabled = true;
+    btn.textContent = 'Syncing…';
   } else {
-    el.classList.add('synced');
-    el.textContent = 'Synced';
+    btn.classList.remove('syncing');
+    btn.disabled = false;
+    btn.textContent = 'Sync Now';
+    const base = 'Last synced: ' + formatLastSync(lastSyncAt);
+    if (state === 'offline') {
+      status.textContent = base + ' · offline';
+    } else if (state === 'error') {
+      status.textContent = base + ' · sync error';
+    } else if (queueLen > 0) {
+      status.textContent = base + ' · ' + queueLen + ' pending';
+    } else {
+      status.textContent = base;
+    }
   }
-  // Repaint history list only when content actually changed (gates out
-  // sync-state-only updates like syncing/synced toggles).
-  const historyVisible = document.getElementById('history-screen').style.display !== 'none';
+  // Pull may have added rows — refresh the visible list. Signature-gated,
+  // so no repaint cost when content is unchanged.
+  const historyScreen = document.getElementById('history-screen');
+  const historyVisible = historyScreen && historyScreen.style.display !== 'none';
   if (historyVisible && typeof rerenderHistoryIfChanged === 'function') {
     try { rerenderHistoryIfChanged(); } catch (e) {}
   }
@@ -1277,7 +1300,7 @@ function startupAfterPin() {
 
   if (window.Sync) {
     Sync.init();
-    Sync.subscribe(({state, queueLen}) => updateSyncIndicator(state, queueLen));
+    Sync.subscribe(renderSyncStatus);
   }
 
   // Check for saved session
@@ -1390,6 +1413,9 @@ document.addEventListener('DOMContentLoaded', () => {
   $('history-btn').addEventListener('click', () => {
     renderHistoryList();
     renderBackupStatus();
+    if (window.Sync && typeof Sync.getState === 'function') {
+      renderSyncStatus(Sync.getState());
+    }
     showScreen('history');
   });
 
@@ -1461,6 +1487,11 @@ document.addEventListener('DOMContentLoaded', () => {
   $('import-file-input').addEventListener('change', (e) => {
     if (e.target.files[0]) Export.fromJSON(e.target.files[0]);
     e.target.value = '';
+  });
+
+  // Manual sync — runs the same flush → pull → flush chain as the 9 PM run.
+  $('sync-now-btn').addEventListener('click', () => {
+    if (window.Sync && typeof Sync.syncNow === 'function') Sync.syncNow();
   });
 
   // Restore from backup folder — bypasses OS file picker (kiosk has no mouse)
