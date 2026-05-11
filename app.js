@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.1.1';
+const APP_VERSION = '1.2.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -7,9 +7,6 @@ const HISTORY_KEY = 'pedal-tracker-history';
 const SETTINGS_KEY = 'pedal-tracker-settings';
 const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
-const HOLD_DELAY_MS = 250;
-const HOLD_FILL_MS = 1750;
-const HOLD_THRESHOLD_MS = HOLD_DELAY_MS + HOLD_FILL_MS;
 
 // === STATE ===
 let session = null;
@@ -25,11 +22,6 @@ let masterGain = null;
 let statusTimeout = null;
 let selectedSection = null;
 let viewingHistorySession = null;
-let bHoldTimer = null;
-let bFillTimer = null;
-let bHoldFired = false;
-let endHoldTimer = null;
-let endFillTimer = null;
 const DEFAULT_THRESHOLDS = {
   'CB-105': { warning: 45, alert: 60 },
   'PVS':    { warning: 45, alert: 60 },
@@ -858,107 +850,25 @@ const Input = {
     if (e.key !== 'b' || e.repeat) return;
     e.preventDefault();
 
-    // B on save/discard screen → save session
     if (!session || !session.active) {
       if ($('save-discard-screen').style.display !== 'none') {
         $('save-btn').click();
         return;
       }
-      // B on summary screen → new session
       if ($('summary-screen').style.display !== 'none') {
         $('new-session-btn').click();
         return;
       }
-      // B on start screen → tap cycles section, hold starts session
       if ($('start-screen').style.display !== 'none') {
-        bHoldFired = false;
-        const startBtn = $('start-btn');
-        if (selectedSection) {
-          bFillTimer = setTimeout(() => {
-            startBtn.classList.remove('filling');
-            void startBtn.offsetWidth;
-            startBtn.classList.add('filling');
-          }, HOLD_DELAY_MS);
-        }
-        bHoldTimer = setTimeout(() => {
-          bHoldFired = true;
-          startBtn.classList.remove('filling');
-          if (!selectedSection) {
-            nudgeSectionSelector();
-            return;
-          }
-          SoundPlayer.init();
-          session = createSession();
-          Storage.save(session);
-          showScreen('session');
-          Timer.start();
-        }, HOLD_THRESHOLD_MS);
+        cycleSection();
       }
       return;
     }
-    // Active session → tap records press, hold ends session
+    // Active session → record press
     const now = Date.now();
     if (now - lastPressTime < DEBOUNCE_MS) return;
     lastPressTime = now;
-
-    bHoldFired = false;
-    const endBtn = $('end-btn');
-    bFillTimer = setTimeout(() => {
-      endBtn.classList.remove('filling');
-      void endBtn.offsetWidth;
-      endBtn.classList.add('filling');
-    }, HOLD_DELAY_MS);
-
-    bHoldTimer = setTimeout(() => {
-      bHoldFired = true;
-      endBtn.classList.remove('filling');
-      if (endConfirmPending) {
-        clearTimeout(endConfirmTimer);
-        endConfirmPending = false;
-      }
-      endBtn.textContent = 'End Session';
-      endBtn.classList.remove('confirm');
-      session.active = false;
-      session.endTime = new Date().toISOString();
-      Timer.stop();
-      const sec = session.sections[session.activeSection];
-      const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
-      const durMin = durMs / 60000;
-      const metrics = computeMetrics(session.activeSection);
-      const rate = durMin > 0.01 ? (sec.count / durMin).toFixed(1) + '/min' : '--/min';
-      const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
-      $('save-discard-stats').innerHTML =
-        `<div>${session.activeSection} &mdash; ${sec.count} presses in ${formatDuration(durMs)}</div>` +
-        `<div class="save-discard-details">` +
-          `<span>Rate: ${rate}</span>` +
-          `<span>Avg: ${avg}</span>` +
-          `<span>Total: ${sec.count}</span>` +
-        `</div>`;
-      showScreen('save-discard');
-    }, HOLD_THRESHOLD_MS);
-  },
-
-  handleKeyUp(e) {
-    if (e.key !== 'b') return;
-    if (bFillTimer) {
-      clearTimeout(bFillTimer);
-      bFillTimer = null;
-    }
-    if (bHoldTimer) {
-      clearTimeout(bHoldTimer);
-      bHoldTimer = null;
-    }
-    $('start-btn').classList.remove('filling');
-    $('end-btn').classList.remove('filling');
-    if (!bHoldFired) {
-      if (!session || !session.active) {
-        if ($('start-screen').style.display !== 'none') {
-          cycleSection();
-        }
-      } else {
-        Input.recordPress(lastPressTime);
-      }
-    }
+    Input.recordPress(lastPressTime);
   },
 
   recordPress(timestamp) {
@@ -1437,7 +1347,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Foot pedal
   document.addEventListener('keydown', Input.handleKeyDown);
-  document.addEventListener('keyup', Input.handleKeyUp);
 
   // Section selector on start screen
   document.querySelectorAll('.section-option').forEach(btn => {
@@ -1452,61 +1361,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // End session
   $('end-btn').addEventListener('click', Input.handleEndSession);
-
-  // Hold-to-end (3 second long press)
-  function startEndHold() {
-    if (!session || !session.active) return;
-    const btn = $('end-btn');
-    btn.classList.remove('filling');
-    endFillTimer = setTimeout(() => {
-      endFillTimer = null;
-      void btn.offsetWidth;
-      btn.classList.add('filling');
-    }, HOLD_DELAY_MS);
-    endHoldTimer = setTimeout(() => {
-      endHoldTimer = null;
-      btn.classList.remove('filling');
-      // Cancel any pending double-tap confirmation
-      if (endConfirmPending) {
-        clearTimeout(endConfirmTimer);
-        endConfirmPending = false;
-      }
-      btn.textContent = 'End Session';
-      btn.classList.remove('confirm');
-      // End the session
-      session.active = false;
-      session.endTime = new Date().toISOString();
-      Timer.stop();
-      const sec = session.sections[session.activeSection];
-      const durMs = new Date(session.endTime).getTime() - new Date(session.startTime).getTime();
-      const durMin = durMs / 60000;
-      const metrics = computeMetrics(session.activeSection);
-      const perHour = durMin > 0.01 ? Math.round(sec.count / durMin * 60) : 0;
-      const rateDisplay = perHour > 0 ? perHour : '--';
-      const avg = metrics.intervals.length > 0 ? formatDuration(metrics.avgInterval) : '--';
-      $('save-discard-stats').innerHTML =
-        `<div class="save-discard-rate">${rateDisplay}<span class="rate-unit">/hr</span></div>` +
-        `<div class="save-discard-meta">${session.activeSection} &middot; ${sec.count} presses &middot; ${formatDuration(durMs)} &middot; avg ${avg}</div>`;
-      showScreen('save-discard');
-    }, HOLD_THRESHOLD_MS);
-  }
-
-  function cancelEndHold() {
-    if (endFillTimer) {
-      clearTimeout(endFillTimer);
-      endFillTimer = null;
-    }
-    if (endHoldTimer) {
-      clearTimeout(endHoldTimer);
-      endHoldTimer = null;
-    }
-    $('end-btn').classList.remove('filling');
-  }
-
-  $('end-btn').addEventListener('pointerdown', startEndHold);
-  $('end-btn').addEventListener('pointerup', cancelEndHold);
-  $('end-btn').addEventListener('pointerleave', cancelEndHold);
-  $('end-btn').addEventListener('pointercancel', cancelEndHold);
 
   // Save session from save/discard screen
   $('save-btn').addEventListener('click', () => {
