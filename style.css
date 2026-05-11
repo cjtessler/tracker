@@ -803,8 +803,8 @@ html, body {
 .history-item {
   background: var(--c-surface);
   border-radius: 8px;
-  padding: 12px 16px;
-  margin-bottom: 8px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
   cursor: pointer;
   touch-action: manipulation;
   transition: background 0.15s;
@@ -817,24 +817,27 @@ html, body {
 .history-item-top {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: baseline;
   margin-bottom: 4px;
 }
 
-.history-item-date {
-  font-size: 14px;
-  color: var(--c-text-c);
+.history-item-rate {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--c-text-a);
+  letter-spacing: -0.5px;
+  line-height: 1;
 }
 
 .history-item-section {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
   color: #6367FF;
 }
 
-.history-item-stats {
-  font-size: 13px;
-  color: var(--c-text-e);
+.history-item-date {
+  font-size: 15px;
+  color: var(--c-text-c);
 }
 
 #history-empty {
