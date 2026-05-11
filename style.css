@@ -909,7 +909,7 @@ html, body {
 
 #stats-chart-wrap {
   flex: 1;
-  overflow-x: auto;
+  overflow-x: hidden;
   overflow-y: hidden;
   -webkit-overflow-scrolling: touch;
   padding: 12px 0 8px 0;

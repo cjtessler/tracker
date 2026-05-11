@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.3.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -1685,7 +1685,12 @@ let statsQueue = 'CB-105';
 
 function renderStatsChart() {
   const history = Storage.loadHistory();
-  const sessions = history.filter(s => s.activeSection === statsQueue && s.endTime);
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime();
+  const prevMonthEnd = monthStart;
+  const allSessions = history.filter(s => s.activeSection === statsQueue && s.endTime);
+  const sessions = allSessions.filter(s => new Date(s.startTime).getTime() >= monthStart);
 
   const canvas = $('stats-canvas');
   const wrap = $('stats-chart-wrap');
@@ -1729,16 +1734,28 @@ function renderStatsChart() {
   });
   const days = Array.from(dayMap.keys()).sort();
 
-  // Chart dimensions
+  // Previous-month per-hour rates (for the second avg line)
+  const prevMonthRates = [];
+  allSessions.forEach(s => {
+    const start = new Date(s.startTime).getTime();
+    if (start < prevMonthStart || start >= prevMonthEnd) return;
+    const end = new Date(s.endTime).getTime();
+    const durMin = (end - start) / 60000;
+    if (durMin < 0.5) return;
+    const count = s.sections[s.activeSection].count;
+    prevMonthRates.push(Math.round(count / durMin * 60));
+  });
+
+  // Chart dimensions — fit the canvas to the container, no horizontal scroll
   const dpr = window.devicePixelRatio || 1;
   const chartHeight = wrap.clientHeight - 4;
   const padTop = 32;
   const padBottom = 44;
   const padLeft = 52;
   const padRight = 20;
-  const dayWidth = 140;
-  const totalDays = days.length;
-  const chartWidth = Math.max(800, padLeft + padRight + totalDays * dayWidth);
+  const chartWidth = wrap.clientWidth;
+  const totalDays = days.length || 1;
+  const dayWidth = (chartWidth - padLeft - padRight) / totalDays;
 
   canvas.width = chartWidth * dpr;
   canvas.height = chartHeight * dpr;
@@ -1756,9 +1773,11 @@ function renderStatsChart() {
   const plotHeight = plotBottom - plotTop;
   const plotLeft = padLeft;
 
-  // Y-axis range
+  // Y-axis range — include both monthly averages so the dashed lines never clip
   const allRates = points.map(p => p.perHour);
-  const maxRate = Math.max(...allRates);
+  const curMonthMean = points.length ? points.reduce((a, p) => a + p.perHour, 0) / points.length : 0;
+  const prevMonthMean = prevMonthRates.length ? prevMonthRates.reduce((a, b) => a + b, 0) / prevMonthRates.length : 0;
+  const maxRate = Math.max(...allRates, curMonthMean, prevMonthMean);
   const yMax = Math.ceil(maxRate / 10) * 10 || 10;
   const ySteps = 5;
   const yStep = yMax / ySteps;
@@ -1771,6 +1790,10 @@ function renderStatsChart() {
   const chartDivColor   = isLight ? '#e8eaff' : '#16213e';
   const chartValColor   = isLight ? '#4a4a6a' : '#ccc';
   const chartAvgColor   = isLight ? '#C46A00' : '#FFB74D';
+  const chartPrevColor  = isLight ? '#6B7280' : '#9CA3AF';
+  const legendBgColor   = isLight ? 'rgba(255,255,255,0.85)' : 'rgba(15,21,40,0.85)';
+  const legendBorder    = isLight ? '#d0d0e0' : '#1a2744';
+  const legendTextColor = isLight ? '#1a1d2e' : '#e6e8f5';
 
   // Grid lines and Y labels
   ctx.strokeStyle = chartGridColor;
@@ -1787,7 +1810,7 @@ function renderStatsChart() {
     ctx.moveTo(plotLeft, y);
     ctx.lineTo(chartWidth - padRight, y);
     ctx.stroke();
-    ctx.fillText(val + '/hr', plotLeft - 6, y);
+    ctx.fillText(String(val), plotLeft - 6, y);
   }
 
   // X positions: each day gets a column
@@ -1803,7 +1826,7 @@ function renderStatsChart() {
   days.forEach((day, i) => {
     const x = dayX(i);
     const d = new Date(day + 'T12:00:00');
-    const label = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const label = String(d.getDate());
     ctx.fillText(label, x, plotBottom + 6);
 
     // Day divider
@@ -1860,28 +1883,70 @@ function renderStatsChart() {
     ctx.fill();
   }
 
-  // Mean rate dashed line — resets monthly, so only includes current-month sessions
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
-  const monthRates = points.filter(p => p.time >= monthStart).map(p => p.perHour);
-  if (monthRates.length > 0) {
-    const meanRate = monthRates.reduce((a, b) => a + b, 0) / monthRates.length;
-    const meanY = yPos(meanRate);
+  // Average lines — orange for current month, muted gray for previous month
+  function drawAvgLine(value, color, dash) {
+    const y = yPos(value);
     ctx.save();
-    ctx.strokeStyle = chartAvgColor;
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
+    ctx.setLineDash(dash);
     ctx.beginPath();
-    ctx.moveTo(plotLeft, meanY);
-    ctx.lineTo(chartWidth - padRight, meanY);
+    ctx.moveTo(plotLeft, y);
+    ctx.lineTo(chartWidth - padRight, y);
     ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = chartAvgColor;
-    ctx.font = 'bold 13px "Segoe UI", Arial, sans-serif';
-    ctx.textAlign = 'right';
-    ctx.textBaseline = 'bottom';
-    const monthLabel = now.toLocaleDateString('en-US', { month: 'short' });
-    ctx.fillText(monthLabel + ' avg ' + Math.round(meanRate) + '/hr', chartWidth - padRight - 6, meanY - 3);
+    ctx.restore();
+  }
+  if (points.length)         drawAvgLine(curMonthMean,  chartAvgColor,  [6, 4]);
+  if (prevMonthRates.length) drawAvgLine(prevMonthMean, chartPrevColor, [2, 4]);
+
+  // Legend (upper-right, larger text)
+  const legendEntries = [];
+  if (points.length)         legendEntries.push({ color: chartAvgColor,  dash: [4, 3], label: 'This month avg: ' + Math.round(curMonthMean) });
+  if (prevMonthRates.length) legendEntries.push({ color: chartPrevColor, dash: [2, 3], label: 'Last month avg: ' + Math.round(prevMonthMean) });
+
+  if (legendEntries.length) {
+    function roundRect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
+    }
+    ctx.save();
+    ctx.font = 'bold 16px "Segoe UI", Arial, sans-serif';
+    ctx.textBaseline = 'middle';
+    const rowH = 22;
+    const swatchW = 18, gap = 8;
+    let textW = 0;
+    legendEntries.forEach(e => { textW = Math.max(textW, ctx.measureText(e.label).width); });
+    const boxW = swatchW + gap + textW + 16;
+    const boxH = legendEntries.length * rowH + 12;
+    const boxX = chartWidth - padRight - boxW;
+    const boxY = plotTop + 4;
+
+    ctx.fillStyle = legendBgColor;
+    ctx.strokeStyle = legendBorder;
+    ctx.lineWidth = 1;
+    roundRect(boxX, boxY, boxW, boxH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    legendEntries.forEach((e, i) => {
+      const cy = boxY + 6 + rowH / 2 + i * rowH;
+      ctx.strokeStyle = e.color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash(e.dash);
+      ctx.beginPath();
+      ctx.moveTo(boxX + 8, cy);
+      ctx.lineTo(boxX + 8 + swatchW, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = legendTextColor;
+      ctx.textAlign = 'left';
+      ctx.fillText(e.label, boxX + 8 + swatchW + gap, cy);
+    });
     ctx.restore();
   }
 
@@ -1905,11 +1970,5 @@ function renderStatsChart() {
     ctx.fillText(p.perHour, p.x, p.y - 8);
   });
 
-  // Scroll to show last 5 days
-  if (totalDays > 5) {
-    const scrollTarget = dayX(totalDays - 5) - padLeft - 20;
-    wrap.scrollLeft = Math.max(0, scrollTarget);
-  } else {
-    wrap.scrollLeft = 0;
-  }
+  wrap.scrollLeft = 0;
 }
