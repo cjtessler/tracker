@@ -1,23 +1,26 @@
 // Sync module — mirrors completed sessions to Supabase via PostgREST.
-// Offline-first: localStorage stays the source of truth; this is a fan-out
-// + startup pull-and-merge. No SDK; raw fetch keeps the app dependency-free.
+// Offline-first: localStorage stays the source of truth. Sync does NOT
+// run live — writes queue locally and drain on a single daily run at
+// 9:00 PM America/New_York, or whenever the user taps "Sync Now".
 window.Sync = (() => {
   const QUEUE_KEY      = 'pedal-tracker-sync-queue';
   const DEAD_KEY       = 'pedal-tracker-sync-deadletter';
   const DEVICE_KEY     = 'pedal-tracker-device-id';
   const HISTORY_KEY    = 'pedal-tracker-history';
   const SYNCED_IDS_KEY = 'pedal-tracker-synced-ids';
+  const LAST_SYNC_KEY  = 'pedal-tracker-last-sync-at';
   const PULL_LIMIT   = 500;
-  const RETRY_MS     = 30000;
   const REQUEST_MS   = 10000;
   const MAX_FAILURES = 3;
+  const SCHEDULED_HOUR_ET = 21; // 9 PM America/New_York
 
   let cfg = null;
   let state = 'disabled';
   let queue = [];
   let syncedIds = new Set();
+  let lastSyncAt = null;
   const listeners = [];
-  let retryTimer = null;
+  let scheduleTimer = null;
   let flushing = false;
 
   const deviceId = (() => {
@@ -47,6 +50,13 @@ window.Sync = (() => {
     try { localStorage.setItem(SYNCED_IDS_KEY, JSON.stringify(Array.from(syncedIds))); }
     catch (e) {}
   }
+  function loadLastSyncAt() {
+    lastSyncAt = localStorage.getItem(LAST_SYNC_KEY) || null;
+  }
+  function setLastSyncAt(iso) {
+    lastSyncAt = iso;
+    try { localStorage.setItem(LAST_SYNC_KEY, iso); } catch (e) {}
+  }
   function markSynced(id) {
     if (id == null) return;
     syncedIds.add(Number(id));
@@ -64,15 +74,11 @@ window.Sync = (() => {
   }
 
   function setState(next) {
-    if (state === next) {
-      notify();
-      return;
-    }
-    state = next;
+    if (state !== next) state = next;
     notify();
   }
   function notify() {
-    const snapshot = { state, queueLen: queue.length };
+    const snapshot = { state, queueLen: queue.length, lastSyncAt };
     listeners.forEach(fn => { try { fn(snapshot); } catch (e) {} });
   }
 
@@ -147,11 +153,6 @@ window.Sync = (() => {
     }
   }
 
-  function scheduleRetry() {
-    clearTimeout(retryTimer);
-    retryTimer = setTimeout(flush, RETRY_MS);
-  }
-
   // Queue upserts for any local sessions that haven't been confirmed on the
   // server yet. Run on init so existing-on-device data gets backed up.
   function queueLocalBackup() {
@@ -200,11 +201,9 @@ window.Sync = (() => {
             }
             persistQueue();
             setState('error');
-            scheduleRetry();
             return;
           }
           setState('offline');
-          scheduleRetry();
           return;
         }
       }
@@ -224,13 +223,11 @@ window.Sync = (() => {
       );
     } catch (e) {
       setState('offline');
-      scheduleRetry();
       return;
     }
     if (!res.ok) {
       if (res.status >= 400 && res.status < 500) setState('error');
       else setState('offline');
-      scheduleRetry();
       return;
     }
     let rows;
@@ -251,7 +248,7 @@ window.Sync = (() => {
     if (!rows.length) { notify(); return; }
 
     // Don't resurrect rows the user has locally deleted but whose delete
-    // hasn't been flushed yet (offline / retry).
+    // hasn't been flushed yet.
     const pendingDeletes = new Set(
       queue.filter(i => i.op === 'delete' && i.payload != null)
            .map(i => Number(i.payload))
@@ -274,50 +271,112 @@ window.Sync = (() => {
     notify();
   }
 
+  // Full sync round-trip: drain queue, pull remote, drain again to cover
+  // anything queued during pull. Only stamps lastSyncAt on full success.
+  async function runFullSync() {
+    if (!configured()) return;
+    await flush();
+    if (state === 'offline' || state === 'error') return;
+    await pull();
+    if (state === 'offline' || state === 'error') return;
+    await flush();
+    if (state === 'offline' || state === 'error') return;
+    setLastSyncAt(new Date().toISOString());
+    notify();
+  }
+
+  // Returns the UTC instant of the next 9:00 PM in America/New_York.
+  // DST is handled implicitly by reading the current ET wall-clock; a
+  // sleep that crosses a DST boundary may fire up to an hour off, but
+  // the next scheduleNext9pmET() call after firing self-corrects.
+  function nextNinePmET() {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    }).formatToParts(now).reduce((o, p) => {
+      if (p.type !== 'literal') o[p.type] = p.value;
+      return o;
+    }, {});
+    // hour12:false may emit '24' for midnight in some locales — normalize.
+    const hour = parts.hour === '24' ? 0 : +parts.hour;
+    // Treat ET wall-clock as if it were UTC to compute the offset.
+    const etAsUtc = Date.UTC(
+      +parts.year, +parts.month - 1, +parts.day,
+      hour, +parts.minute, +parts.second
+    );
+    const etOffsetMs = etAsUtc - now.getTime();
+    // Today's 21:00 ET as a UTC instant.
+    let target = Date.UTC(+parts.year, +parts.month - 1, +parts.day, SCHEDULED_HOUR_ET, 0, 0) - etOffsetMs;
+    if (target <= now.getTime()) {
+      target += 24 * 60 * 60 * 1000;
+    }
+    return new Date(target);
+  }
+
+  function scheduleNext9pmET() {
+    clearTimeout(scheduleTimer);
+    if (!configured()) return;
+    const target = nextNinePmET();
+    const delayMs = Math.max(1000, target.getTime() - Date.now());
+    scheduleTimer = setTimeout(() => {
+      runFullSync().finally(scheduleNext9pmET);
+    }, delayMs);
+  }
+
   return {
     init() {
       cfg = window.APP_CONFIG || null;
       loadQueue();
       loadSyncedIds();
+      loadLastSyncAt();
       if (!configured()) { setState('disabled'); return; }
-      // Backup any local sessions not yet confirmed on the server.
       queueLocalBackup();
       setState('idle');
-      notify();
-      window.addEventListener('online', () => flush());
-      // Drain queue first (so pending deletes propagate before pulling),
-      // then pull, then flush again to cover anything queued during pull.
-      flush().then(pull).then(flush);
+      scheduleNext9pmET();
     },
     upsert(s) {
       if (state === 'disabled') return;
-      // Treat as unsynced until the server confirms via performOp().
       markUnsynced(s && s.id);
       queue.push({ op: 'upsert', payload: s });
       persistQueue();
       notify();
-      flush();
     },
     remove(id) {
       if (state === 'disabled') return;
       queue.push({ op: 'delete', payload: id });
       persistQueue();
       notify();
-      flush();
     },
     removeAll(ids) {
       if (state === 'disabled') return;
       ids.forEach(id => queue.push({ op: 'delete', payload: id }));
       persistQueue();
       notify();
-      flush();
+    },
+    syncNow() {
+      if (!configured() || flushing) return Promise.resolve();
+      return runFullSync();
     },
     pull,
     flush,
     subscribe(fn) {
       listeners.push(fn);
-      try { fn({ state, queueLen: queue.length }); } catch (e) {}
+      try { fn({ state, queueLen: queue.length, lastSyncAt }); } catch (e) {}
     },
-    getState() { return { state, queueLen: queue.length }; }
+    getState() { return { state, queueLen: queue.length, lastSyncAt }; },
+    getLastSyncAt() { return lastSyncAt; },
+    // Exposed for testing — schedules a one-shot sync N ms from now.
+    _scheduleInMs(ms) {
+      clearTimeout(scheduleTimer);
+      scheduleTimer = setTimeout(() => {
+        runFullSync().finally(scheduleNext9pmET);
+      }, Math.max(0, ms));
+    },
+    _nextScheduledAt() {
+      return nextNinePmET().toISOString();
+    }
   };
 })();
