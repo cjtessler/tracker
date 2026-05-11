@@ -176,9 +176,6 @@ html, body {
   font-size: 30px;
   border: 1px solid var(--c-sec-idle-bdr);
   border-radius: 12px;
-  position: relative;
-  overflow: hidden;
-  z-index: 0;
   width: 100%;
   flex: 1 1 auto;
   display: flex;
@@ -213,26 +210,6 @@ html, body {
 .btn-start:not(:disabled) .start-btn-title,
 .btn-start:not(:disabled) .start-btn-icon {
   color: #fff;
-}
-
-.btn-start::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #6367FF;
-  transform: scaleX(0);
-  transform-origin: left;
-  z-index: -1;
-  will-change: transform;
-}
-
-.btn-start.filling::after {
-  animation: btn-fill 1750ms linear forwards;
-}
-
-@keyframes btn-fill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
 }
 
 .btn-start:not(:disabled):active {
@@ -521,33 +498,6 @@ html, body {
   padding: 0;
   font-size: 20px;
   border: 1px solid #6367FF44;
-  position: relative;
-  overflow: hidden;
-  z-index: 0;
-}
-
-.btn-end::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: #6367FF;
-  transform: scaleX(0);
-  transform-origin: left;
-  z-index: -1;
-  will-change: transform;
-}
-
-.btn-end.filling {
-  color: #fff;
-}
-
-.btn-end.filling::after {
-  animation: end-btn-fill 1750ms linear forwards;
-}
-
-@keyframes end-btn-fill {
-  from { transform: scaleX(0); }
-  to   { transform: scaleX(1); }
 }
 
 .btn-end:active {
