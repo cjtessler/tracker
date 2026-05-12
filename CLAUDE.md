@@ -66,7 +66,7 @@ The version stamp shown in the Settings header is **derived from git**, not edit
 git config core.hooksPath .githooks
 bash .githooks/_write-version.sh   # seed version.js once
 ```
-After that, `git pull`, `git checkout`, and `git commit` regenerate `version.js` automatically. Without this setup, the header falls back to `vdev` (harmless — the app still runs). Claude Code on the web sessions handle this automatically via `.claude/hooks/session-start.sh`.
+After that, `git pull`, `git checkout`, and `git commit` regenerate `version.js` automatically. Without this setup, the header falls back to `vdev` (harmless — the app still runs). Claude Code on the web sessions handle this automatically via `.claude/hooks/session-start.sh`. **GitHub Pages deploys run `.github/workflows/pages.yml`** which generates `version.js` at deploy time and uploads it with the Pages artifact — no per-deploy setup needed. (Requires repo Settings → Pages → Source = "GitHub Actions".)
 
 ## Planned Work
 
