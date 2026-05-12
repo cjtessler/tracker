@@ -1514,7 +1514,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = '';
   });
 
-  // Manual sync — runs the same flush → pull → flush chain as the 9 PM run.
+  // Manual sync — runs the same flush → pull → flush chain as the 5 PM run.
   $('sync-now-btn').addEventListener('click', () => {
     if (window.Sync && typeof Sync.syncNow === 'function') Sync.syncNow();
   });
