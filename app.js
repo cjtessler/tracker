@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.4.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -1489,7 +1489,7 @@ document.addEventListener('DOMContentLoaded', () => {
     e.target.value = '';
   });
 
-  // Manual sync — runs the same flush → pull → flush chain as the 9 PM run.
+  // Manual sync — runs the same flush → pull → flush chain as the 5 PM run.
   $('sync-now-btn').addEventListener('click', () => {
     if (window.Sync && typeof Sync.syncNow === 'function') Sync.syncNow();
   });
