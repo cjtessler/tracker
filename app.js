@@ -11,8 +11,9 @@ const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
 // Phone / tablet viewport gates the mobile History+Stats experience. The Pi
-// reports 800px so this stays false there.
-const isMobileView = () => window.matchMedia('(max-width: 700px)').matches;
+// is exactly 800x480 so neither clause matches there; iPhone portrait hits the
+// max-width branch, iPhone landscape (e.g. 874x402) hits the max-height branch.
+const isMobileView = () => window.matchMedia('(max-width: 799px), (max-height: 479px)').matches;
 
 // === STATE ===
 let session = null;
