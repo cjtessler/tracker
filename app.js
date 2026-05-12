@@ -1,5 +1,5 @@
 // === CONSTANTS ===
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.5.0';
 const SECTIONS = ['CB-105', 'PVS', 'PVSI', 'SMS', 'OP222'];
 const DEBOUNCE_MS = 200;
 const STORAGE_KEY = 'pedal-tracker-session';
@@ -7,6 +7,10 @@ const HISTORY_KEY = 'pedal-tracker-history';
 const SETTINGS_KEY = 'pedal-tracker-settings';
 const CONFIRM_TIMEOUT_MS = 3000;
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
+
+// Phone / tablet viewport gates the mobile History+Stats experience. The Pi
+// reports 800px so this stays false there.
+const isMobileView = () => window.matchMedia('(max-width: 700px)').matches;
 
 // === STATE ===
 let session = null;
@@ -1296,6 +1300,27 @@ function adjustGoal(dir) {
 
 // === INITIALIZATION ===
 function startupAfterPin() {
+  // Phone view: skip session entry / resume / startup restore; pull and show History.
+  if (isMobileView()) {
+    if (window.Sync) {
+      Sync.init();
+      Sync.subscribe(renderSyncStatus);
+      // syncNow() does flush → pull → flush; we want the pull. Render local data if it fails.
+      Promise.resolve(typeof Sync.syncNow === 'function' ? Sync.syncNow() : null)
+        .catch(() => {})
+        .finally(() => {
+          renderHistoryList();
+          renderBackupStatus();
+          if (typeof Sync.getState === 'function') renderSyncStatus(Sync.getState());
+          showScreen('history');
+        });
+    } else {
+      renderHistoryList();
+      showScreen('history');
+    }
+    return;
+  }
+
   attemptStartupRestore();
 
   if (window.Sync) {
@@ -1564,6 +1589,35 @@ document.addEventListener('DOMContentLoaded', () => {
       statsQueue = btn.dataset.section;
       renderStatsChart();
     });
+  });
+
+  const setMobileTab = (which) => {
+    document.querySelectorAll('.mtab').forEach(b => b.classList.remove('active'));
+    const tab = which === 'stats' ? $('mtab-stats') : $('mtab-history');
+    if (tab) tab.classList.add('active');
+  };
+  $('mtab-history').addEventListener('click', () => {
+    setMobileTab('history');
+    renderHistoryList();
+    renderBackupStatus();
+    if (window.Sync && typeof Sync.getState === 'function') {
+      renderSyncStatus(Sync.getState());
+    }
+    showScreen('history');
+  });
+  $('mtab-stats').addEventListener('click', () => {
+    setMobileTab('stats');
+    showScreen('stats');
+    renderStatsChart();
+  });
+
+  // Chart reads container size each render, so a re-call after resize is enough.
+  let statsResizeTimer = null;
+  window.addEventListener('resize', () => {
+    const statsScreen = $('stats-screen');
+    if (!statsScreen || statsScreen.style.display === 'none') return;
+    clearTimeout(statsResizeTimer);
+    statsResizeTimer = setTimeout(renderStatsChart, 150);
   });
 
   // Settings modal
