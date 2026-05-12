@@ -1,7 +1,7 @@
 // Sync module — mirrors completed sessions to Supabase via PostgREST.
 // Offline-first: localStorage stays the source of truth. Sync does NOT
 // run live — writes queue locally and drain on a single daily run at
-// 9:00 PM America/New_York, or whenever the user taps "Sync Now".
+// 5:00 PM America/New_York, or whenever the user taps "Sync Now".
 window.Sync = (() => {
   const QUEUE_KEY      = 'pedal-tracker-sync-queue';
   const DEAD_KEY       = 'pedal-tracker-sync-deadletter';
@@ -12,7 +12,7 @@ window.Sync = (() => {
   const PULL_LIMIT   = 500;
   const REQUEST_MS   = 10000;
   const MAX_FAILURES = 3;
-  const SCHEDULED_HOUR_ET = 21; // 9 PM America/New_York
+  const SCHEDULED_HOUR_ET = 17; // 5 PM America/New_York
 
   let cfg = null;
   let state = 'disabled';
@@ -285,11 +285,11 @@ window.Sync = (() => {
     notify();
   }
 
-  // Returns the UTC instant of the next 9:00 PM in America/New_York.
+  // Returns the UTC instant of the next 5:00 PM in America/New_York.
   // DST is handled implicitly by reading the current ET wall-clock; a
   // sleep that crosses a DST boundary may fire up to an hour off, but
-  // the next scheduleNext9pmET() call after firing self-corrects.
-  function nextNinePmET() {
+  // the next scheduleNextSyncET() call after firing self-corrects.
+  function nextScheduledET() {
     const now = new Date();
     const parts = new Intl.DateTimeFormat('en-US', {
       timeZone: 'America/New_York',
@@ -308,7 +308,7 @@ window.Sync = (() => {
       hour, +parts.minute, +parts.second
     );
     const etOffsetMs = etAsUtc - now.getTime();
-    // Today's 21:00 ET as a UTC instant.
+    // Today's 17:00 ET as a UTC instant.
     let target = Date.UTC(+parts.year, +parts.month - 1, +parts.day, SCHEDULED_HOUR_ET, 0, 0) - etOffsetMs;
     if (target <= now.getTime()) {
       target += 24 * 60 * 60 * 1000;
@@ -316,13 +316,15 @@ window.Sync = (() => {
     return new Date(target);
   }
 
-  function scheduleNext9pmET() {
+  function scheduleNextSyncET() {
     clearTimeout(scheduleTimer);
     if (!configured()) return;
-    const target = nextNinePmET();
+    const target = nextScheduledET();
     const delayMs = Math.max(1000, target.getTime() - Date.now());
     scheduleTimer = setTimeout(() => {
-      runFullSync().finally(scheduleNext9pmET);
+      // Hard-refresh after the scheduled run so any pulled rows / UI
+      // updates show up. Reload re-runs Sync.init() which reschedules.
+      runFullSync().finally(() => location.reload(true));
     }, delayMs);
   }
 
@@ -335,7 +337,7 @@ window.Sync = (() => {
       if (!configured()) { setState('disabled'); return; }
       queueLocalBackup();
       setState('idle');
-      scheduleNext9pmET();
+      scheduleNextSyncET();
     },
     upsert(s) {
       if (state === 'disabled') return;
@@ -372,11 +374,11 @@ window.Sync = (() => {
     _scheduleInMs(ms) {
       clearTimeout(scheduleTimer);
       scheduleTimer = setTimeout(() => {
-        runFullSync().finally(scheduleNext9pmET);
+        runFullSync().finally(scheduleNextSyncET);
       }, Math.max(0, ms));
     },
     _nextScheduledAt() {
-      return nextNinePmET().toISOString();
+      return nextScheduledET().toISOString();
     }
   };
 })();
