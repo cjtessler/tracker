@@ -1531,3 +1531,126 @@ html, body {
   cursor: default;
 }
 
+/* === MOBILE TAB BAR (hidden on Pi, shown by mobile media query) === */
+#mobile-tabbar {
+  display: none;
+}
+
+/* === MOBILE VIEW (iPhone / narrow viewports) ===
+   The Pi reports an 800px viewport, so these rules never apply there.
+   Activated for phones (< 700px). History + Stats only — no session controls. */
+@media (max-width: 700px) {
+  html, body {
+    width: 100%;
+    height: 100dvh;
+    overflow: hidden;
+  }
+
+  .screen {
+    width: 100%;
+    height: 100dvh;
+    position: absolute;
+    top: 0;
+    left: 0;
+  }
+
+  #history-header,
+  #history-detail-header,
+  #stats-header {
+    height: 52px;
+    padding: 0 12px;
+  }
+  #history-header span,
+  #history-detail-header span,
+  #stats-header span {
+    font-size: 16px;
+  }
+
+  /* Pi-only / destructive controls; tab bar replaces the back-to-start buttons. */
+  #history-clear-btn,
+  #restore-btn,
+  #import-btn,
+  #export-csv-btn,
+  #export-json-btn,
+  #detail-delete-btn,
+  #history-back-btn,
+  #stats-back-btn {
+    display: none !important;
+  }
+
+  /* Bottom padding reserves space for the fixed tab bar (60px + safe-area). */
+  #history-list {
+    padding: 6px 10px 76px;
+  }
+  .history-item {
+    padding: 12px 14px;
+    margin-bottom: 8px;
+  }
+  .history-item-rate {
+    font-size: 22px;
+  }
+  .history-item-section {
+    font-size: 14px;
+  }
+  .history-item-date {
+    font-size: 13px;
+  }
+
+  #history-detail-body {
+    padding: 10px 14px 76px;
+  }
+  .summary-stats {
+    grid-template-columns: 1fr;
+    font-size: 16px;
+    gap: 4px 0;
+  }
+
+  #stats-queue-selector {
+    padding: 8px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .stats-queue-btn {
+    font-size: 13px;
+    padding: 8px 0;
+    min-width: calc(33% - 6px);
+  }
+  #stats-chart-wrap {
+    padding: 8px 0 76px 0;
+  }
+
+  #history-footer {
+    height: 44px;
+    padding: 0 10px;
+  }
+  #sync-status {
+    font-size: 13px;
+  }
+
+  #mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    background: var(--c-nav-deep);
+    border-top: 1px solid var(--c-footer-border);
+    z-index: 50;
+  }
+  .mtab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--c-text-c);
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .mtab.active {
+    color: #6367FF;
+  }
+}
+
